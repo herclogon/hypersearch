@@ -5,7 +5,6 @@
 * allocates more resources to promising hyperparameter configurations while quickly eliminating poor ones
 * adaptive computation increases efficiency, thereby examining orders of magnitude more hyperparameter configurations
 * relies on an early-stopping strategy for pruning hyperparameter configurations
-* overall, a general-purpose technique, making minimal assumptions about the problem
 
 ## Intuition
 
@@ -19,37 +18,40 @@ We should note, however, that there are some counterexamples to this. For the le
 
 #### Notation
 
-* `B`: total, fixed, finite time budget
-* `n`: number of hyperparameter configurations. Here, we sample the `n` i.i.d. samples from some distribution defined over the hyperparameter configuration space.
+* `B`: finite time budget
+* `n`: number of sampled hyperparameter configurations
+* `r`: minimum amount of resource that can be allocated to a single configuration
+*  `R`: maximum amount of resource that can be allocated to a single configuration
+* `nu`: proportion of configurations discarded in each round of *Successive Halving*
 
 #### Dilemna
 
-HYPERBAND extends the *Successive Halving* algorithm and calls it as a subroutine. The idea behind this algorithm is to uniformly allocate a budget to a set of hyperparameter configurations, evaluate the performance of all configurations, throw out the worst half, and repeat until one configurations remains. 
+HYPERBAND extends the *Successive Halving* algorithm and calls it as a subroutine. The idea behind this algorithm is to uniformly allocate a budget to a set of hyperparameter configurations, evaluate the performance of all configurations, throw out the worst half, and repeat until one configurations remains. Thus, successive halving allocates **exponentially** more resources to more promising configurations. We can show that on average, given a fixed time budget `B` and `n` hyperparameter configurations, *Successive Halving* allocates `B/n` resources across the configurations.
 
-Thus, successive halving allocates **exponentially** more resources to more promising configurations. We can show that on average, given a fixed time budget `B` and `n` hyperparameter configurations, *Successive Halving* allocates `B/n` resources across the configurations.
+The authors argue that forcing the user to pick a value of `n` is a crucial drawback to the algorithm since it involves a certain tradeoff. In fact:
 
-The authors argue that forcing the user to pick a value of n is a crucial drawback to the algorithm since it involves a certain tradeoff.
+* a small `n` means a smaller number of configurations with longer average training times, i.e. more resourcers per config.
+* a large `n` means a larger number of configurations with smaller average training times, i.e. less resources per config.
 
-* a small n means a smaller number of configurations with longer average training times, i.e. more resourcers per config.
-* a large n means a larger number of configurations with smaller average training times, i.e. less resources per config.
-
-There are cases that warrant a small n (when 2 configs converge slowly, it gets harder to differentiate between the 2, and similarly, when 2 configs have very similar performace, it gets harder to tell them apart, so we need to train for longer, i.e. dedicate more resources per config) and other cases that warrant a larger n (if the iterative training method converges very quickly and the quality of configs is revealed using minimal resources, so we need to train less, i.e. dedicate less resources per config).
+There are cases that warrant a small `n` (when 2 configs converge slowly, it gets harder to differentiate between the 2, and similarly, when 2 configs have very similar performace, it gets harder to tell them apart, so we need to train for longer, i.e. dedicate more resources per config) and other cases that warrant a larger `n` (if the iterative training method converges very quickly and the quality of configs is revealed using minimal resources, so we need to train less, i.e. dedicate less resources per config).
 
 #### Solution
 
-HYPERBAND tries to address this “**n versus B/n**” problem by performing a grid search over feasible value of n for a given B. It consists in 2 components:
+HYPERBAND tries to address this “**n versus B/n**” problem by performing a grid search over feasible value of `n` for a given `B`. It consists in 2 components:
 
-* an inner loop that invokes the *Successive Halving* algorithm for a fixed `n` and `r`.
 * an outer loop which iterates over different values of `n` and `r`.
+* an inner loop that invokes the *Successive Halving* algorithm for each `n` and `r` above.
 
-It requires 2 inputs:
+HYPERBAND requires 2 inputs from the user:
 
 - `R`: maximum amount of resource that can be allocated to a single configuration
-- `nu`: controls the proportion of configurations discarded in each round of *Successive Halving* (classically, `nu=2`)
+- `nu`: proportion of configurations discarded in each round of *Successive Halving*
 
-These 2 inputs dictate how many runs of *Successive Halving* happen. The outer loop ranges from `s_max + 1` to `0` where `s_max` is a function of `R`. In each s (also called bracket), we reduce `n` successively by `nu`.
+These 2 inputs dictate how many runs of *Successive Halving* happen. In fact, the outer loop ranges from `s_max + 1` to `0` where `s_max` is a function of `R`. Furthermore, in each s, we reduce `n` successively by `nu`.
 
 ## Example
+
+Let's say the user decides that the maximum number of iterations he would like to train a neural network for is `81` epochs and that he would like to retain `1/3` of each hyperparameter configuration at every round of *Successive Halving*. In that case:
 
 * `R = 81`
 * `nu = 3`
