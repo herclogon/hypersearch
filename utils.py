@@ -1,18 +1,32 @@
 import numpy as np
 
-params = {
-    'conv1_l2': ['log', 5e-5, 5],
-    'conv2_l2': ['log', 5e-5, 5],
-    'fc1_l2': ['log', 5e-5, 5],
-    'fc2_l2': ['log', 5e-5, 5],
-}
+from numpy import random
 
 
-def parse_params(params):
+def parse_config(val):
     """
-    Parse the dictionary of hyperparameters
-    and return a new dictionary where the i'th
-    key corresponds to a hyperparameter, and
-    the i'th value corresponds to 
-
+    Parse a list containing the distribution
+    to sample from with associated parameters.
     """
+    s = val[0]
+
+    if s == 'randint':
+        return randint(val[1])
+    elif s == 'uniform':
+        return uniform(val[1], val[2])
+    elif s == 'quniform':
+        return round(uniform(val[1], val[2]) / val[3]) * val[3]
+    elif s == 'log_uniform':
+        return np.exp(uniform(val[1], val[2]))
+    elif s == 'log_quniform':
+        return round(np.exp(uniform(val[1], val[2])) / val[3]) * val[3]
+    elif s == 'normal':
+        return normal(val[1], val[2])
+    elif s == 'qnormal':
+        return round(normal(val[1], val[2]) / val[3]) * val[3]
+    elif s == 'log_normal':
+        return np.exp(normal(val[1], val[2]))
+    elif s == 'log_qnormal':
+        return round(np.exp(normal(val[1], val[2])) / val[3]) * val[3]
+    else:
+        raise ValueError('[!] Unsupported distribution')
