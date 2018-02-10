@@ -18,3 +18,8 @@
         * random for each
         * same for each
     * per layer
+
+
+## Order of Params
+
+`conv/fc -> ReLU -> Batch Norm -> Dropout`

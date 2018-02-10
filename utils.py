@@ -1,6 +1,12 @@
 import numpy as np
 
+import torch.nn as nn
+
 from numpy.random import uniform, normal, randint, choice
+
+
+def find_key(params, partial_key):
+    return next(v for k, v in params.items() if partial_key in k)
 
 
 def sample_from(space):
@@ -31,3 +37,18 @@ def sample_from(space):
     if quantized:
         samp = (samp / space[3]) * space[3]
     return samp
+
+
+def str2act(a):
+    if a == 'relu':
+        return nn.ReLU()
+    elif a == 'selu':
+        return nn.SELU()
+    elif a == 'elu':
+        return nn.ELU()
+    elif a == 'tanh':
+        return nn.Tanh()
+    elif a == 'sigmoid':
+        return nn.Sigmoid()
+    else:
+        raise ValueError('[!] Unsupported activation.')

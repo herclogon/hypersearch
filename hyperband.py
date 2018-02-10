@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import parse_config
+from utils import sample_from, str2act, find_key
 
 import torch
 import torch.nn as nn
@@ -51,7 +51,7 @@ class Hyperband(object):
 
         Args
         ----
-        - model: the PyTorch model you wish to tune.
+        - model: the `Sequential()` model you wish to tune.
         - params: a dictionary where each key is a
           hyperparameter, and each entry is a list of
           the form [s, min, max]. s specifies the scale
@@ -92,55 +92,151 @@ class Hyperband(object):
 
     def get_random_config(self):
         """
-        Return a set of i.i.d samples from the distributions
-        defined over the hyperparameter configuration space.
-
-        This returns a set of hyperparameters for a single
-        configuration.
-
-        Returns
-        -------
-        - hyperparams: a list containing the hyperparameter
-          samples sampled from their respective distributions.
-        """
-        spaces = list(self.params.values())
-        hyperparams = [sample_from(space) for space in spaces]
-        return hyperparams
-
-    def build_new_model(self, hyperparams):
-        """
         Build a modified version of the user's model that
         incorporates the new hyperparameters settings defined
         by `hyperparams`.
         """
-        layer_hps = list(self.params.keys())
-        old_layer_names = [x[0] for x in list(self.model.named_children())]
-        old_layers = list(self.model.children())
-        unique = list(
-            set(
-                [
-                    l.split('_', 1)[0] if 'all' not in l 
-                    else l.split('_', 1)[1] for l in layer_hps
-                ]
-            )
-        )
-
         layers = []
-        for i, old_name in enumerate(old_layer_names):
-            # nothing to modify so get from old
-            if old_name not in unique:
-                layers.append(old_layers[i])
-                # potentially add batch norm
-                if 'batch_norm' in unique:
-                    size = layers[i].out_channels
-                    layers.append(nn.BatchNorm2d(size))
+        used_acts = []
+        all_act = False
+        all_drop = False
+        all_batchnorm = False
+        num_layers = len(self.model)
+
+        i = 0
+        for layer_hp in self.params.keys():
+            layer, hp = layer_hp.split('_', 1)
+
+            # single layer op
+            if layer.isdigit():
+                layer_num = int(layer)
+                diff = layer_num - i
+
+                # copy up to current layer
+                if diff > 0:
+                    for j in range(diff):
+                        layers.append(self.model[i+j])
+                    i += diff
+                    layers.append(self.model[i])
+
+                elif diff == 0:
+                    layers.append(self.model[i])
+                    if hp == 'l2':
+                        layers.append(self.model[i+1])
+                    elif hp == 'act':
+                        space = find_key(
+                            self.params, '{}_act'.format(layer_num)
+                        )
+                        hyperp = sample_from(space)
+                        new_act = str2act(hyperp)
+                        used_acts.append(new_act.__str__())
+                        layers.append(new_act)
+                        i += 1
+                    elif hp == 'dropout':
+                        i += 1
+                        layers.append(self.model[i])
+                        space = find_key(
+                            self.params, '{}_drop'.format(layer_num)
+                        )
+                        hyperp = sample_from(space)
+                        layers.append(nn.Dropout(p=hyperp))
+
+                else:
+                    if hp == 'act':
+                        space = find_key(
+                            self.params, '{}_act'.format(layer_num)
+                        )
+                        hyperp = sample_from(space)
+                        new_act = str2act(hyperp)
+                        used_acts.append(new_act.__str__())
+                        layers[i] = new_act
+                    elif hp == 'dropout':
+                        space = find_key(
+                            self.params, '{}_drop'.format(layer_num)
+                        )
+                        hyperp = sample_from(space)
+                        layers.append(nn.Dropout(p=hyperp))
+                        layers.append(self.model[i])
+                    elif hp == 'l2':
+                        pass
+                    else:
+                        pass
+                i += 1
+
+            # `all` layer op
             else:
-                # create new layer using hyperparams
-                old_layer = old_layers[i]
+                if (i < num_layers) and (len(layers) < num_layers):
+                    for j in range(num_layers-i):
+                        layers.append(self.model[i+j])
+                    i += 1
+                if layer == "all":
+                    if hp == "act":
+                        all_act = True
+                    elif hp == "dropout":
+                        all_drop = True
+                    elif hp == "batchnorm":
+                        space = self.params['all_batchnorm']
+                        hyperp = sample_from(space)
+                        all_batchnorm = True if hyperp == 1 else False
+                    else:
+                        raise ValueError("[!] Not supported key.")
 
+        if all_act:
+            old_act = str(layers[1])
+            space = self.params['all_act']
+            hyperp = sample_from(space)
+            new_act = str2act(hyperp)
 
+            for i, l in enumerate(layers):
+                if l.__str__() == old_act:
+                    layers[i] = new_act
 
-    def run_config(self, num_iters, hyperparams):
+        if all_batchnorm:
+            act = str(layers[1])
+            for i, l in enumerate(layers):
+                if all_act:
+                    if l.__str__() == act:
+                        if 'Linear' in layers[i-1].__str__():
+                            bn = nn.BatchNorm2d(layers[i-1].out_features)
+                        else:
+                            bn = nn.BatchNorm2d(layers[i-1].out_channels)
+                        layers.insert(i+1, bn)
+                else:
+                    if l.__str__() in used_acts:
+                        if 'Linear' in layers[i-1].__str__():
+                            bn = nn.BatchNorm2d(layers[i-1].out_features)
+                        else:
+                            bn = nn.BatchNorm2d(layers[i-1].out_channels)
+                        layers.insert(i+1, bn)
+
+            if 'Linear' in layers[-2].__str__():
+                bn = nn.BatchNorm2d(layers[i-1].out_features)
+            else:
+                bn = nn.BatchNorm2d(layers[i-1].out_channels)
+            layers.insert(-1, bn)
+
+        if all_drop:
+            act = str(layers[1])
+            space = self.params['all_dropout']
+            hyperp = sample_from(space)
+
+            for i, l in enumerate(layers):
+                if all_act:
+                    if l.__str__() == act:
+                        if all_batchnorm:
+                            layers.insert(i+2, nn.Dropout(p=hyperp))
+                        else:
+                            layers.insert(i+1, nn.Dropout(p=hyperp))
+                else:
+                    if l.__str__() in used_acts:
+                        if all_batchnorm:
+                            layers.insert(i+2, nn.Dropout(p=hyperp))
+                        else:
+                            layers.insert(i+1, nn.Dropout(p=hyperp))
+
+        return nn.Sequential(*layers)
+
+    def run_config(self, num_iters, model):
         """
         Train a particular hyperparameter configuration for a
         given number of iterations and evaluate the loss on the
@@ -159,20 +255,4 @@ class Hyperband(object):
         -------
         - val_losses: [...]
         """
-        # construct model
-
-
-
-        for layer_hp in self.params.keys():
-            layer, hp = layer_hp.rsplit('_', 1)
-            if hp == 'act':
-                pass
-            elif hp == 'l2':
-                pass
-            elif hp == 'batch_norm':
-                pass
-            elif hp == 'dropout':
-                pass
-
-            layer_hps.append([(layer, hp, choice) for choice in space])
-
+        pass
