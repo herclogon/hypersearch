@@ -78,6 +78,7 @@ class Hyperband(object):
 
             # finite horizon SH with (n, r)
             T = [self.get_random_config() for i in range(n)]
+
             for i in range(s + 1):
                 n_i = n * self.eta ** (-i)
                 r_i = r * self.eta ** (i)
@@ -104,6 +105,7 @@ class Hyperband(object):
         num_layers = len(self.model)
 
         i = 0
+        used_acts.append(model[1].__str__())
         for layer_hp in self.params.keys():
             layer, hp = layer_hp.split('_', 1)
 
@@ -178,8 +180,12 @@ class Hyperband(object):
                         space = self.params['all_batchnorm']
                         hyperp = sample_from(space)
                         all_batchnorm = True if hyperp == 1 else False
+                    elif hp == "l2":
+                        pass
                     else:
                         raise ValueError("[!] Not supported key.")
+
+        used_acts = list(set(used_acts))
 
         if all_act:
             old_act = str(layers[1])
