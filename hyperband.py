@@ -185,36 +185,27 @@ class Hyperband(object):
                     else:
                         raise ValueError("[!] Not supported key.")
 
-        used_acts = list(set(used_acts))
+        used_acts = sorted(set(used_acts), key=used_acts.index)
 
         if all_act:
-            old_act = str(layers[1])
+            old_act = used_acts[0]
             space = self.params['all_act']
             hyperp = sample_from(space)
             new_act = str2act(hyperp)
-
             for i, l in enumerate(layers):
                 if l.__str__() == old_act:
                     layers[i] = new_act
 
         if all_batchnorm:
-            act = str(layers[1])
+            target_acts = [used_acts[0]] if not all_act else used_acts
             for i, l in enumerate(layers):
-                if all_act:
-                    if l.__str__() == act:
-                        if 'Linear' in layers[i-1].__str__():
-                            bn = nn.BatchNorm2d(layers[i-1].out_features)
-                        else:
-                            bn = nn.BatchNorm2d(layers[i-1].out_channels)
-                        layers.insert(i+1, bn)
-                else:
-                    if l.__str__() in used_acts:
-                        if 'Linear' in layers[i-1].__str__():
-                            bn = nn.BatchNorm2d(layers[i-1].out_features)
-                        else:
-                            bn = nn.BatchNorm2d(layers[i-1].out_channels)
-                        layers.insert(i+1, bn)
-
+                if l.__str__() in target_acts:
+                    if 'Linear' in layers[i-1].__str__():
+                        bn = nn.BatchNorm2d(layers[i-1].out_features)
+                    else:
+                        bn = nn.BatchNorm2d(layers[i-1].out_channels)
+                    layers.insert(i+1, bn)
+            # output layer
             if 'Linear' in layers[-2].__str__():
                 bn = nn.BatchNorm2d(layers[i-1].out_features)
             else:
@@ -222,23 +213,12 @@ class Hyperband(object):
             layers.insert(-1, bn)
 
         if all_drop:
-            act = str(layers[1])
+            target_acts = [used_acts[0]] if not all_act else used_acts
             space = self.params['all_dropout']
             hyperp = sample_from(space)
-
             for i, l in enumerate(layers):
-                if all_act:
-                    if l.__str__() == act:
-                        if all_batchnorm:
-                            layers.insert(i+2, nn.Dropout(p=hyperp))
-                        else:
-                            layers.insert(i+1, nn.Dropout(p=hyperp))
-                else:
-                    if l.__str__() in used_acts:
-                        if all_batchnorm:
-                            layers.insert(i+2, nn.Dropout(p=hyperp))
-                        else:
-                            layers.insert(i+1, nn.Dropout(p=hyperp))
+                if l.__str__() in target_acts:
+                    layers.insert(i + 1 + all_batchnorm, nn.Dropout(p=hyperp))
 
         return nn.Sequential(*layers)
 
