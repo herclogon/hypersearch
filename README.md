@@ -1,23 +1,17 @@
 ## Supported Hyperparameters
 
-* activation
-    * all
-    * per layer
-* L2 regularization (weights & biases)
-    * all
-    * per layer
-* learning rate
-* optimizer
-* Add Batch Norm
-    * sandiwched between ever layer
-* Add Dropout
-    * all
-    * per layer
-* Change Dropout Rate
-    * all
-        * random for each
-        * same for each
-    * per layer
+- [x] Activation
+    - [x] all
+    - [x] per layer
+- [ ] L1/L2 regularization (weights & biases)
+    - [ ] all
+    - [ ] per layer
+- [x] Add Batch Norm
+    - [x] sandiwched between ever layer
+- [x] Add Dropout
+    - [x] sandiwched between ever layer
+- [ ] Learning Rate
+- [ ] Optimizer
 
 
 ## Order of Params
