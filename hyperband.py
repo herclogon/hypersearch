@@ -44,7 +44,7 @@ class Hyperband(object):
         # total number of iterations per execution of SH
         self.B = (self.s_max+1) * max_iter
 
-    def tune(self, model, params):
+    def tune(self, model, params, data_loaders):
         """
         Tune the hyperparameters of the pytorch model
         using Hyperband.
@@ -57,12 +57,14 @@ class Hyperband(object):
           the form [s, min, max]. s specifies the scale
           (i.e. linear, log, integer) bounded by the min
           and max.
+        - data_loaders: [...]
 
         Returns
         -------
         - results: [...]
         """
         self.model = model
+        self.data_loaders = data_loaders
         self.params = params
 
         # finite horizon outerloop
@@ -206,6 +208,7 @@ class Hyperband(object):
                 if l.__str__() == old_act:
                     layers[i] = new_act
         if all_batchnorm:
+            self.all_batchnorm = True
             target_acts = used_acts if not all_act else used_acts[1:]
             for i, l in enumerate(layers):
                 if l.__str__() in target_acts:
@@ -220,6 +223,7 @@ class Hyperband(object):
                 bn = nn.BatchNorm2d(layers[i-1].out_channels)
             layers.insert(-1, bn)
         if all_drop:
+            self.all_drop = True
             target_acts = used_acts if not all_act else used_acts[1:]
             space = self.params['all_dropout'][1][1]
             hyperp = sample_from(space)
@@ -228,6 +232,32 @@ class Hyperband(object):
                     layers.insert(i + 1 + all_batchnorm, nn.Dropout(p=hyperp))
 
         return nn.Sequential(*layers)
+
+    def add_regularization(self, model):
+        """
+        Setup regularization on model layers based
+        on parameter dictionary.
+        """
+        reg_layers = []
+        for k in self.params.keys():
+            if k in ["all_l2", "all_l1"]:
+                reg_layers.append('all')
+            elif k.split('_', 1)[1] in ["l2", "l1"]:
+                layer_num = int(k.split('_', 1)[0])
+                if layer_num != 0:
+                    layer_num += (layer_num // 2) * (
+                        self.all_batchnorm + self.all_drop
+                    )
+                layer_num = str(layer_num)
+                l2_reg = True
+                if k.split('_', 1)[1] == "l1":
+                    l2_reg = False
+                space = self.params[k]
+                hyperp = sample_from(space)
+                reg_layers.append((layer_num, hyperp, l2_reg))
+            else:
+                pass
+        return reg_layers
 
     def run_config(self, model, num_iters):
         """
@@ -248,4 +278,7 @@ class Hyperband(object):
         -------
         - val_losses: [...]
         """
-        pass
+        reg_layers = self.add_regularization(model)
+
+        
+
