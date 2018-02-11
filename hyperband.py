@@ -20,7 +20,7 @@ class Hyperband(object):
     ----------
     - [1]: Li et. al., https://arxiv.org/abs/1603.06560
     """
-    def __init__(self, max_iter=81, eta=3):
+    def __init__(self, max_iter=81, eta=4, epoch_scale=True):
         """
         Initialize the Hyperband object.
 
@@ -31,7 +31,12 @@ class Hyperband(object):
           configuration.
         - eta: proportion of configurations discarded
           in each round of Successive Halving (SH).
+        - epoch_scale: if True, `max_iter` is computed in
+          terms of epochs, else in terms of iterations per
+          epoch.
         """
+        self.epoch_scale = epoch_scale
+
         # max number of iterations allocated to a given config
         self.max_iter = max_iter
 
@@ -44,7 +49,7 @@ class Hyperband(object):
         # total number of iterations per execution of SH
         self.B = (self.s_max+1) * max_iter
 
-    def tune(self, model, params, data_loaders):
+    def tune(self, model, params, data_loader):
         """
         Tune the hyperparameters of the pytorch model
         using Hyperband.
@@ -57,14 +62,14 @@ class Hyperband(object):
           the form [s, min, max]. s specifies the scale
           (i.e. linear, log, integer) bounded by the min
           and max.
-        - data_loaders: [...]
+        - data_loader: [...]
 
         Returns
         -------
         - results: [...]
         """
         self.model = model
-        self.data_loaders = data_loaders
+        self.data_loader = data_loader
         self.params = params
 
         # finite horizon outerloop
@@ -278,7 +283,14 @@ class Hyperband(object):
         -------
         - val_losses: [...]
         """
+        # get possible regularizers
         reg_layers = self.add_regularization(model)
 
-        
+        start_epoch = 0
+        lr = 
+
+
+
+
+
 
