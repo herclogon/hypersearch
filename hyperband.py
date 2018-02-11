@@ -44,7 +44,7 @@ class Hyperband(object):
         # total number of iterations per execution of SH
         self.B = (self.s_max+1) * max_iter
 
-    def tune(self, model, params, data_loaders):
+    def tune(self, model, params):
         """
         Tune the hyperparameters of the pytorch model
         using Hyperband.
@@ -73,23 +73,25 @@ class Hyperband(object):
                     self.B / self.max_iter / (s+1) * self.eta ** s
                 )
             )
-            # initial number of iterations to run the n configs for
-            r = self.max_iter * self.eta ** (-s)
+            # # initial number of iterations to run the n configs for
+            # r = self.max_iter * self.eta ** (-s)
 
             # finite horizon SH with (n, r)
             T = [self.get_random_config() for i in range(n)]
 
-            for i in range(s + 1):
-                n_i = n * self.eta ** (-i)
-                r_i = r * self.eta ** (i)
+            # for i in range(s + 1):
+            #     n_i = n * self.eta ** (-i)
+            #     r_i = r * self.eta ** (i)
 
-                # run each of the n_i configs for r_i iterations
-                val_losses = [self.run_config(r_i, t) for t in T]
+            #     # run each of the n_i configs for r_i iterations
+            #     val_losses = [self.run_config(r_i, t) for t in T]
 
-                # keep the best n_i / eta
-                T = [
-                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-                ]
+            #     # keep the best n_i / eta
+            #     T = [
+            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+            #     ]
+
+            return T
 
     def get_random_config(self):
         """
@@ -105,7 +107,7 @@ class Hyperband(object):
         num_layers = len(self.model)
 
         i = 0
-        used_acts.append(model[1].__str__())
+        used_acts.append(self.model[1].__str__())
         for layer_hp in self.params.keys():
             layer, hp = layer_hp.split('_', 1)
 
@@ -114,17 +116,32 @@ class Hyperband(object):
                 layer_num = int(layer)
                 diff = layer_num - i
 
-                # copy up to current layer
                 if diff > 0:
-                    for j in range(diff):
+                    for j in range(diff + 1):
                         layers.append(self.model[i+j])
                     i += diff
-                    layers.append(self.model[i])
-
+                    if hp == 'l2':
+                        pass
+                    elif hp == 'act':
+                        space = find_key(
+                            self.params, '{}_act'.format(layer_num)
+                        )
+                        hyperp = sample_from(space)
+                        new_act = str2act(hyperp)
+                        used_acts.append(new_act.__str__())
+                        layers.append(new_act)
+                        i += 1
+                    elif hp == 'dropout':
+                        layers.append(self.model[i])
+                        space = find_key(
+                            self.params, '{}_drop'.format(layer_num)
+                        )
+                        hyperp = sample_from(space)
+                        layers.append(nn.Dropout(p=hyperp))
                 elif diff == 0:
                     layers.append(self.model[i])
                     if hp == 'l2':
-                        layers.append(self.model[i+1])
+                        pass
                     elif hp == 'act':
                         space = find_key(
                             self.params, '{}_act'.format(layer_num)
@@ -142,7 +159,6 @@ class Hyperband(object):
                         )
                         hyperp = sample_from(space)
                         layers.append(nn.Dropout(p=hyperp))
-
                 else:
                     if hp == 'act':
                         space = find_key(
@@ -192,12 +208,13 @@ class Hyperband(object):
             space = self.params['all_act']
             hyperp = sample_from(space)
             new_act = str2act(hyperp)
+            used_acts.append(new_act.__str__())
             for i, l in enumerate(layers):
                 if l.__str__() == old_act:
                     layers[i] = new_act
 
         if all_batchnorm:
-            target_acts = [used_acts[0]] if not all_act else used_acts
+            target_acts = used_acts if not all_act else used_acts[1:]
             for i, l in enumerate(layers):
                 if l.__str__() in target_acts:
                     if 'Linear' in layers[i-1].__str__():
@@ -205,7 +222,6 @@ class Hyperband(object):
                     else:
                         bn = nn.BatchNorm2d(layers[i-1].out_channels)
                     layers.insert(i+1, bn)
-            # output layer
             if 'Linear' in layers[-2].__str__():
                 bn = nn.BatchNorm2d(layers[i-1].out_features)
             else:
@@ -213,7 +229,7 @@ class Hyperband(object):
             layers.insert(-1, bn)
 
         if all_drop:
-            target_acts = [used_acts[0]] if not all_act else used_acts
+            target_acts = used_acts if not all_act else used_acts[1:]
             space = self.params['all_dropout']
             hyperp = sample_from(space)
             for i, l in enumerate(layers):
