@@ -18,12 +18,11 @@ def main():
     params = {
         # '0_dropout': ['uniform', 0.1, 0.5],
         # '0_act': ['choice', ['relu', 'selu', 'elu', 'tanh', 'sigmoid']],
-        # '0_l2': ['log_uniform', 5e-5, 5],
+        '0_l2': ['log_uniform', 5e-5, 5],
         # '2_act': ['choice', ['selu', 'elu', 'tanh', 'sigmoid']],
-        '4_l2': ['log_uniform', 5e-5, 5],
-        # 'all_act': ['choice', ['relu', 'selu', 'elu']],
-        'all_act': ['choice', ['selu', 'elu', 'tanh', 'sigmoid']],
-        'all_dropout': ['uniform', 0.1, 0.5],
+        '4_l1': ['log_uniform', 5e-5, 5],
+        'all_act': ['choice', [[0], ['choice', ['selu', 'elu', 'tanh', 'sigmoid']]]],
+        'all_dropout': ['choice', [[0], ['uniform', 0.1, 0.5]]],
         'all_batchnorm': ['choice', [0, 1]],
         # 'all_l2': ['log_uniform', 5e-5, 5],
     }

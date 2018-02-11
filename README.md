@@ -7,9 +7,9 @@
     - [ ] all
     - [ ] per layer
 - [x] Add Batch Norm
-    - [x] sandiwched between ever layer
+    - [x] sandwiched between ever layer
 - [x] Add Dropout
-    - [x] sandiwched between ever layer
+    - [x] sandwiched between ever layer
 - [ ] Learning Rate
 - [ ] Optimizer
 

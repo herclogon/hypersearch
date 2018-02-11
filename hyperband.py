@@ -84,7 +84,7 @@ class Hyperband(object):
                 r_i = r * self.eta ** (i)
 
                 # run each of the n_i configs for r_i iterations
-                val_losses = [self.run_config(r_i, t) for t in T]
+                val_losses = [self.run_config(t, r_i) for t in T]
 
                 # keep the best n_i / eta
                 T = [
@@ -99,23 +99,18 @@ class Hyperband(object):
         """
         layers = []
         used_acts = []
-        reg_layers = []
         all_act = False
         all_drop = False
         all_batchnorm = False
-        all_reg = False
         num_layers = len(self.model)
 
         i = 0
         used_acts.append(self.model[1].__str__())
         for layer_hp in self.params.keys():
             layer, hp = layer_hp.split('_', 1)
-
-            # single layer op
             if layer.isdigit():
                 layer_num = int(layer)
                 diff = layer_num - i
-
                 if diff > 0:
                     for j in range(diff + 1):
                         layers.append(self.model[i+j])
@@ -137,7 +132,7 @@ class Hyperband(object):
                         hyperp = sample_from(space)
                         layers.append(nn.Dropout(p=hyperp))
                     else:
-                        reg_layers.append(layer_num)
+                        pass
                 elif diff == 0:
                     layers.append(self.model[i])
                     if hp == 'act':
@@ -158,7 +153,7 @@ class Hyperband(object):
                         hyperp = sample_from(space)
                         layers.append(nn.Dropout(p=hyperp))
                     else:
-                        reg_layers.append(layer_num)
+                        pass
                 else:
                     if hp == 'act':
                         space = find_key(
@@ -176,10 +171,8 @@ class Hyperband(object):
                         layers.append(nn.Dropout(p=hyperp))
                         layers.append(self.model[i])
                     else:
-                        reg_layers.append(layer_num)
+                        pass
                 i += 1
-
-            # `all` layer op
             else:
                 if (i < num_layers) and (len(layers) < num_layers):
                     for j in range(num_layers-i):
@@ -187,32 +180,31 @@ class Hyperband(object):
                     i += 1
                 if layer == "all":
                     if hp == "act":
-                        all_act = True
+                        space = self.params['all_act']
+                        hyperp = sample_from(space)
+                        all_act = False if hyperp == [0] else True
                     elif hp == "dropout":
-                        space = params['all_dropout']
+                        space = self.params['all_dropout']
                         hyperp = sample_from(space)
                         all_drop = False if hyperp == [0] else True
                     elif hp == "batchnorm":
                         space = self.params['all_batchnorm']
                         hyperp = sample_from(space)
                         all_batchnorm = True if hyperp == 1 else False
-                    elif hp == "l2":
-                        all_reg = True
                     else:
-                        raise ValueError("[!] Not supported key.")
+                        pass
 
         used_acts = sorted(set(used_acts), key=used_acts.index)
 
         if all_act:
             old_act = used_acts[0]
-            space = self.params['all_act']
+            space = self.params['all_act'][1][1]
             hyperp = sample_from(space)
             new_act = str2act(hyperp)
             used_acts.append(new_act.__str__())
             for i, l in enumerate(layers):
                 if l.__str__() == old_act:
                     layers[i] = new_act
-
         if all_batchnorm:
             target_acts = used_acts if not all_act else used_acts[1:]
             for i, l in enumerate(layers):
@@ -227,7 +219,6 @@ class Hyperband(object):
             else:
                 bn = nn.BatchNorm2d(layers[i-1].out_channels)
             layers.insert(-1, bn)
-
         if all_drop:
             target_acts = used_acts if not all_act else used_acts[1:]
             space = self.params['all_dropout'][1][1]
@@ -238,7 +229,7 @@ class Hyperband(object):
 
         return nn.Sequential(*layers)
 
-    def run_config(self, num_iters, model):
+    def run_config(self, model, num_iters):
         """
         Train a particular hyperparameter configuration for a
         given number of iterations and evaluate the loss on the
@@ -249,9 +240,9 @@ class Hyperband(object):
 
         Args
         ----
+        - model: 
         - num_iters: an int indicating the number of iterations
           to train the model for.
-        - hyperparams: hyperparameters
 
         Returns
         -------
