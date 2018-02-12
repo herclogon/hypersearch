@@ -50,9 +50,11 @@ def main():
         # 'all_l2': ['log_uniform', 5e-5, 5],
     }
 
+    # instantiate hyperband object
+    hyperband = Hyperband(model, params, data_loader)
+
     # tune
-    hyperband = Hyperband()
-    hyperband.tune(model, params, data_loader)
+    hyperband.tune()
 
 
 if __name__ == '__main__':

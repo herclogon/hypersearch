@@ -20,12 +20,21 @@ class Hyperband(object):
     ----------
     - [1]: Li et. al., https://arxiv.org/abs/1603.06560
     """
-    def __init__(self, max_iter=81, eta=4, epoch_scale=True):
+    def __init__(self,
+                 model,
+                 params,
+                 data_loader,
+                 max_iter=81,
+                 eta=4,
+                 epoch_scale=True):
         """
         Initialize the Hyperband object.
 
         Args
         ----
+        - model:
+        - params:
+        - data_loader:
         - max_iter: maximum amount of iterations that
           you are willing to allocate to a single
           configuration.
@@ -36,20 +45,40 @@ class Hyperband(object):
           epoch.
         """
         self.epoch_scale = epoch_scale
-
-        # max number of iterations allocated to a given config
         self.max_iter = max_iter
-
-        # proportion of configs discarded in each round of SH
         self.eta = eta
-
-        # number of unique executions of SH
         self.s_max = int(np.log(max_iter) / np.log(eta))
-
-        # total number of iterations per execution of SH
         self.B = (self.s_max+1) * max_iter
 
-    def tune(self, model, params, data_loader):
+        self.model = model
+        self.data_loader = data_loader
+
+        self._parse_params(params)
+
+    def _parse_params(self, params):
+        """
+        Split the user-defined params dictionary
+        into its different components.
+        """
+        self.net_params = {}
+        self.optim_params = {}
+        self.reg_params = {}
+
+        net_filter = ["act", "dropout", "batchnorm"]
+        optim_filter = ["lr", "optim", "momentum"]
+        reg_filter = ["l2", "l1"]
+
+        for k, v in params.items():
+            if any(s in k for s in net_filter):
+                self.net_params[k] = v
+            elif any(s in k for s in optim_filter):
+                self.optim_params[k] = v
+            elif any(s in k for s in reg_filter):
+                self.reg_params[k] = v
+            else:
+                raise ValueError("[!] key not supported.")
+
+    def tune(self):
         """
         Tune the hyperparameters of the pytorch model
         using Hyperband.
@@ -68,10 +97,6 @@ class Hyperband(object):
         -------
         - results: [...]
         """
-        self.model = model
-        self.data_loader = data_loader
-        self.params = params
-
         # finite horizon outerloop
         for s in reversed(range(self.s_max + 1)):
             # initial number of configs
@@ -113,7 +138,7 @@ class Hyperband(object):
 
         i = 0
         used_acts.append(self.model[1].__str__())
-        for layer_hp in self.params.keys():
+        for layer_hp in self.net_params.keys():
             layer, hp = layer_hp.split('_', 1)
             if layer.isdigit():
                 layer_num = int(layer)
@@ -124,7 +149,7 @@ class Hyperband(object):
                     i += diff
                     if hp == 'act':
                         space = find_key(
-                            self.params, '{}_act'.format(layer_num)
+                            self.net_params, '{}_act'.format(layer_num)
                         )
                         hyperp = sample_from(space)
                         new_act = str2act(hyperp)
@@ -134,7 +159,7 @@ class Hyperband(object):
                     elif hp == 'dropout':
                         layers.append(self.model[i])
                         space = find_key(
-                            self.params, '{}_drop'.format(layer_num)
+                            self.net_params, '{}_drop'.format(layer_num)
                         )
                         hyperp = sample_from(space)
                         layers.append(nn.Dropout(p=hyperp))
@@ -144,7 +169,7 @@ class Hyperband(object):
                     layers.append(self.model[i])
                     if hp == 'act':
                         space = find_key(
-                            self.params, '{}_act'.format(layer_num)
+                            self.net_params, '{}_act'.format(layer_num)
                         )
                         hyperp = sample_from(space)
                         new_act = str2act(hyperp)
@@ -155,7 +180,7 @@ class Hyperband(object):
                         i += 1
                         layers.append(self.model[i])
                         space = find_key(
-                            self.params, '{}_drop'.format(layer_num)
+                            self.net_params, '{}_drop'.format(layer_num)
                         )
                         hyperp = sample_from(space)
                         layers.append(nn.Dropout(p=hyperp))
@@ -164,7 +189,7 @@ class Hyperband(object):
                 else:
                     if hp == 'act':
                         space = find_key(
-                            self.params, '{}_act'.format(layer_num)
+                            self.net_params, '{}_act'.format(layer_num)
                         )
                         hyperp = sample_from(space)
                         new_act = str2act(hyperp)
@@ -172,7 +197,7 @@ class Hyperband(object):
                         layers[i] = new_act
                     elif hp == 'dropout':
                         space = find_key(
-                            self.params, '{}_drop'.format(layer_num)
+                            self.net_params, '{}_drop'.format(layer_num)
                         )
                         hyperp = sample_from(space)
                         layers.append(nn.Dropout(p=hyperp))
@@ -187,15 +212,15 @@ class Hyperband(object):
                     i += 1
                 if layer == "all":
                     if hp == "act":
-                        space = self.params['all_act']
+                        space = self.net_params['all_act']
                         hyperp = sample_from(space)
                         all_act = False if hyperp == [0] else True
                     elif hp == "dropout":
-                        space = self.params['all_dropout']
+                        space = self.net_params['all_dropout']
                         hyperp = sample_from(space)
                         all_drop = False if hyperp == [0] else True
                     elif hp == "batchnorm":
-                        space = self.params['all_batchnorm']
+                        space = self.net_params['all_batchnorm']
                         hyperp = sample_from(space)
                         all_batchnorm = True if hyperp == 1 else False
                     else:
@@ -205,7 +230,7 @@ class Hyperband(object):
 
         if all_act:
             old_act = used_acts[0]
-            space = self.params['all_act'][1][1]
+            space = self.net_params['all_act'][1][1]
             hyperp = sample_from(space)
             new_act = str2act(hyperp)
             used_acts.append(new_act.__str__())
@@ -230,7 +255,7 @@ class Hyperband(object):
         if all_drop:
             self.all_drop = True
             target_acts = used_acts if not all_act else used_acts[1:]
-            space = self.params['all_dropout'][1][1]
+            space = self.net_params['all_dropout'][1][1]
             hyperp = sample_from(space)
             for i, l in enumerate(layers):
                 if l.__str__() in target_acts:
@@ -244,7 +269,7 @@ class Hyperband(object):
         on parameter dictionary.
         """
         reg_layers = []
-        for k in self.params.keys():
+        for k in self.reg_params.keys():
             if k in ["all_l2", "all_l1"]:
                 reg_layers.append('all')
             elif k.split('_', 1)[1] in ["l2", "l1"]:
@@ -257,7 +282,7 @@ class Hyperband(object):
                 l2_reg = True
                 if k.split('_', 1)[1] == "l1":
                     l2_reg = False
-                space = self.params[k]
+                space = self.reg_params[k]
                 hyperp = sample_from(space)
                 reg_layers.append((layer_num, hyperp, l2_reg))
             else:
@@ -286,8 +311,7 @@ class Hyperband(object):
         # get possible regularizers
         reg_layers = self.add_regularization(model)
 
-        start_epoch = 0
-        lr = 
+        pass
 
 
 
