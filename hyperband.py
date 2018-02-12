@@ -1,5 +1,6 @@
 import numpy as np
 
+from collections import OrderedDict
 from utils import sample_from, str2act, find_key
 
 import torch
@@ -32,9 +33,12 @@ class Hyperband(object):
 
         Args
         ----
-        - model:
-        - params:
-        - data_loader:
+        - model: the `Sequential()` model you wish to tune.
+        - params: a dictionary where the key is the hyperparameter
+          to tune, and the value is the space from which to randomly
+          sample it.
+        - data_loader: a tuple containing train and valid iterators
+          over the desired dataset.
         - max_iter: maximum amount of iterations that
           you are willing to allocate to a single
           configuration.
@@ -82,20 +86,6 @@ class Hyperband(object):
         """
         Tune the hyperparameters of the pytorch model
         using Hyperband.
-
-        Args
-        ----
-        - model: the `Sequential()` model you wish to tune.
-        - params: a dictionary where each key is a
-          hyperparameter, and each entry is a list of
-          the form [s, min, max]. s specifies the scale
-          (i.e. linear, log, integer) bounded by the min
-          and max.
-        - data_loader: [...]
-
-        Returns
-        -------
-        - results: [...]
         """
         # finite horizon outerloop
         for s in reversed(range(self.s_max + 1)):
@@ -109,19 +99,24 @@ class Hyperband(object):
             r = self.max_iter * self.eta ** (-s)
 
             # finite horizon SH with (n, r)
-            T = [self.get_random_config() for i in range(n)]
+            # T = [self.get_random_config() for i in range(n)]
 
-            for i in range(s + 1):
-                n_i = n * self.eta ** (-i)
-                r_i = r * self.eta ** (i)
+            # for i in range(s + 1):
+            #     n_i = n * self.eta ** (-i)
+            #     r_i = r * self.eta ** (i)
 
-                # run each of the n_i configs for r_i iterations
-                val_losses = [self.run_config(t, r_i) for t in T]
+            #     # run each of the n_i configs for r_i iterations
+            #     val_losses = [self.run_config(t, r_i) for t in T]
 
-                # keep the best n_i / eta
-                T = [
-                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-                ]
+            #     # keep the best n_i / eta
+            #     T = [
+            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+            #     ]
+
+
+        model = self.get_random_config()
+        print(model)
+        self.run_config(model, 1)
 
     def get_random_config(self):
         """
@@ -129,6 +124,9 @@ class Hyperband(object):
         incorporates the new hyperparameters settings defined
         by `hyperparams`.
         """
+        self.all_batchnorm = False
+        self.all_drop = False
+
         layers = []
         used_acts = []
         all_act = False
@@ -229,6 +227,7 @@ class Hyperband(object):
         used_acts = sorted(set(used_acts), key=used_acts.index)
 
         if all_act:
+            print("ACTIVATION TRUE!!!!!!!!")
             old_act = used_acts[0]
             space = self.net_params['all_act'][1][1]
             hyperp = sample_from(space)
@@ -238,6 +237,7 @@ class Hyperband(object):
                 if l.__str__() == old_act:
                     layers[i] = new_act
         if all_batchnorm:
+            print("BATCHNORM TRUE!!!!!!!!")
             self.all_batchnorm = True
             target_acts = used_acts if not all_act else used_acts[1:]
             for i, l in enumerate(layers):
@@ -253,6 +253,7 @@ class Hyperband(object):
                 bn = nn.BatchNorm2d(layers[i-1].out_channels)
             layers.insert(-1, bn)
         if all_drop:
+            print("DROPOUT TRUE!!!!!!!!")
             self.all_drop = True
             target_acts = used_acts if not all_act else used_acts[1:]
             space = self.net_params['all_dropout'][1][1]
@@ -269,15 +270,15 @@ class Hyperband(object):
         on parameter dictionary.
         """
         reg_layers = []
+
         for k in self.reg_params.keys():
             if k in ["all_l2", "all_l1"]:
                 reg_layers.append('all')
             elif k.split('_', 1)[1] in ["l2", "l1"]:
                 layer_num = int(k.split('_', 1)[0])
-                if layer_num != 0:
-                    layer_num += (layer_num // 2) * (
-                        self.all_batchnorm + self.all_drop
-                    )
+                layer_num += (layer_num // 2) * (
+                    self.all_batchnorm + self.all_drop
+                )
                 layer_num = str(layer_num)
                 l2_reg = True
                 if k.split('_', 1)[1] == "l1":
@@ -311,7 +312,9 @@ class Hyperband(object):
         # get possible regularizers
         reg_layers = self.add_regularization(model)
 
-        pass
+        print(reg_layers)
+
+        return
 
 
 

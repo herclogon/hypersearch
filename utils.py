@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 import torch.nn as nn
@@ -21,6 +22,8 @@ def sample_from(space):
         'normal': normal,
     }
     s = space[0]
+
+    np.random.seed(int(time.time() + np.random.randint(0, 300)))
 
     log = s.startswith('log_')
     s = s[len('log_'):] if log else s

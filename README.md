@@ -24,4 +24,4 @@
 
 ## Default
 
-- `optimizer`: `Adam(lr=1e-3)`
+- optimizer: `Adam(lr=1e-3)`

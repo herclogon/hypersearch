@@ -5,7 +5,7 @@ from hyperband import Hyperband
 from data_loader import get_train_valid_loader
 
 
-random_seed = 1
+random_seed = 42424
 use_gpu = False
 data_dir = './data/'
 batch_size = 64
@@ -16,11 +16,11 @@ name = 'mnist'
 
 def main():
 
-    # ensure reproducibility
-    torch.manual_seed(random_seed)
+    # # ensure reproducibility
+    # torch.manual_seed(random_seed)
     kwargs = {}
     if use_gpu:
-        torch.cuda.manual_seed(random_seed)
+        # torch.cuda.manual_seed(random_seed)
         kwargs = {'num_workers': 1, 'pin_memory': True}
 
     data_loader = get_train_valid_loader(
@@ -32,9 +32,13 @@ def main():
     layers = []
     layers.append(nn.Linear(784, 512))
     layers.append(nn.ReLU())
+    layers.append(nn.Linear(512, 512))
+    layers.append(nn.ReLU())
     layers.append(nn.Linear(512, 256))
     layers.append(nn.ReLU())
-    layers.append(nn.Linear(256, 10))
+    layers.append(nn.Linear(256, 128))
+    layers.append(nn.ReLU())
+    layers.append(nn.Linear(128, 10))
     layers.append(nn.Softmax())
     model = nn.Sequential(*layers)
 
@@ -42,6 +46,7 @@ def main():
         # '0_dropout': ['uniform', 0.1, 0.5],
         # '0_act': ['choice', ['relu', 'selu', 'elu', 'tanh', 'sigmoid']],
         '0_l2': ['log_uniform', 5e-5, 5],
+        '2_l2': ['log_uniform', 5e-5, 5],
         # '2_act': ['choice', ['selu', 'elu', 'tanh', 'sigmoid']],
         '4_l1': ['log_uniform', 5e-5, 5],
         'all_act': ['choice', [[0], ['choice', ['selu', 'elu', 'tanh', 'sigmoid']]]],
@@ -55,6 +60,18 @@ def main():
 
     # tune
     hyperband.tune()
+
+    print(model)
+
+    # 0, 2, 4, 6
+
+    # 0, 3, 6, 9
+
+    # 0, 4, 8, 12
+
+
+
+
 
 
 if __name__ == '__main__':
