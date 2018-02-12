@@ -32,27 +32,28 @@ def main():
     layers = []
     layers.append(nn.Linear(784, 512))
     layers.append(nn.ReLU())
-    layers.append(nn.Linear(512, 512))
-    layers.append(nn.ReLU())
     layers.append(nn.Linear(512, 256))
     layers.append(nn.ReLU())
     layers.append(nn.Linear(256, 128))
     layers.append(nn.ReLU())
-    layers.append(nn.Linear(128, 10))
-    layers.append(nn.Softmax())
+    layers.append(nn.Linear(256, 10))
+    layers.append(nn.Softmax(dim=1))
     model = nn.Sequential(*layers)
 
     params = {
         # '0_dropout': ['uniform', 0.1, 0.5],
         # '0_act': ['choice', ['relu', 'selu', 'elu', 'tanh', 'sigmoid']],
-        '0_l2': ['log_uniform', 5e-5, 5],
-        '2_l2': ['log_uniform', 5e-5, 5],
+        '0_l2': ['log_uniform', 5e-5, 2],
         # '2_act': ['choice', ['selu', 'elu', 'tanh', 'sigmoid']],
-        '4_l1': ['log_uniform', 5e-5, 5],
+        '2_l1': ['log_uniform', 5e-5, 2],
+        '2_hidden': ['quniform', 512, 1000, 1],
+        '4_hidden': ['quniform', 128, 512, 1],
         'all_act': ['choice', [[0], ['choice', ['selu', 'elu', 'tanh', 'sigmoid']]]],
         'all_dropout': ['choice', [[0], ['uniform', 0.1, 0.5]]],
         'all_batchnorm': ['choice', [0, 1]],
         # 'all_l2': ['log_uniform', 5e-5, 5],
+        # 'optim': ['choice', ["adam", "sgd"]],
+        # 'lr': ['choice', [1e-3, 1e-4]],
     }
 
     # instantiate hyperband object
@@ -62,17 +63,6 @@ def main():
     hyperband.tune()
 
     print(model)
-
-    # 0, 2, 4, 6
-
-    # 0, 3, 6, 9
-
-    # 0, 4, 8, 12
-
-
-
-
-
 
 if __name__ == '__main__':
     main()

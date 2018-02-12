@@ -12,10 +12,11 @@
     - [x] sandwiched between ever layer
 - [x] Add Dropout
     - [x] sandwiched between ever layer
-- [ ] Add Hidden Layer
-- [ ] Change Hidden Layer Size
-- [x] Learning Rate
+- [x] Change Hidden Layer Size
 - [x] Optimizer
+- [x] Learning Rate
+- [x] Momentum
+- [x] Batch Size
 
 
 ## Order of Params

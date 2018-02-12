@@ -6,6 +6,8 @@ from utils import sample_from, str2act, find_key
 import torch
 import torch.nn as nn
 
+from torch.autograd import Variable
+
 
 class Hyperband(object):
     """
@@ -64,16 +66,20 @@ class Hyperband(object):
         Split the user-defined params dictionary
         into its different components.
         """
+        self.size_params = {}
         self.net_params = {}
         self.optim_params = {}
         self.reg_params = {}
 
+        size_filter = ["hidden"]
         net_filter = ["act", "dropout", "batchnorm"]
-        optim_filter = ["lr", "optim", "momentum"]
+        optim_filter = ["lr", "optim", "batchsize", "momentum"]
         reg_filter = ["l2", "l1"]
 
         for k, v in params.items():
-            if any(s in k for s in net_filter):
+            if any(s in k for s in size_filter):
+                self.size_params[k] = v
+            elif any(s in k for s in net_filter):
                 self.net_params[k] = v
             elif any(s in k for s in optim_filter):
                 self.optim_params[k] = v
@@ -227,7 +233,6 @@ class Hyperband(object):
         used_acts = sorted(set(used_acts), key=used_acts.index)
 
         if all_act:
-            print("ACTIVATION TRUE!!!!!!!!")
             old_act = used_acts[0]
             space = self.net_params['all_act'][1][1]
             hyperp = sample_from(space)
@@ -237,7 +242,6 @@ class Hyperband(object):
                 if l.__str__() == old_act:
                     layers[i] = new_act
         if all_batchnorm:
-            print("BATCHNORM TRUE!!!!!!!!")
             self.all_batchnorm = True
             target_acts = used_acts if not all_act else used_acts[1:]
             for i, l in enumerate(layers):
@@ -253,7 +257,6 @@ class Hyperband(object):
                 bn = nn.BatchNorm2d(layers[i-1].out_channels)
             layers.insert(-1, bn)
         if all_drop:
-            print("DROPOUT TRUE!!!!!!!!")
             self.all_drop = True
             target_acts = used_acts if not all_act else used_acts[1:]
             space = self.net_params['all_dropout'][1][1]
@@ -261,6 +264,26 @@ class Hyperband(object):
             for i, l in enumerate(layers):
                 if l.__str__() in target_acts:
                     layers.insert(i + 1 + all_batchnorm, nn.Dropout(p=hyperp))
+
+        sizes = {}
+        for k, v in self.size_params.items():
+            layer_num = int(k.split("_", 1)[0])
+            layer_num += (layer_num // 2) * (
+                self.all_batchnorm + self.all_drop
+            )
+            hyperp = sample_from(v)
+            sizes[layer_num] = hyperp
+
+        for layer, size in sizes.items():
+            in_dim = layers[layer].in_features
+            layers[layer] = nn.Linear(in_dim, size)
+            if self.all_batchnorm:
+                layers[layer + 2] = nn.BatchNorm2d(size)
+            next_layer = layer + (
+                2 + self.all_batchnorm + self.all_drop
+            )
+            out_dim = layers[next_layer].out_features
+            layers[next_layer] = nn.Linear(size, out_dim)
 
         return nn.Sequential(*layers)
 
@@ -270,7 +293,6 @@ class Hyperband(object):
         on parameter dictionary.
         """
         reg_layers = []
-
         for k in self.reg_params.keys():
             if k in ["all_l2", "all_l1"]:
                 reg_layers.append('all')
@@ -309,12 +331,23 @@ class Hyperband(object):
         -------
         - val_losses: [...]
         """
-        # get possible regularizers
+        # compute regularizer loss
         reg_layers = self.add_regularization(model)
-
         print(reg_layers)
+        # reg_loss = Variable(torch.FloatTensor(1), requires_grad=True)
+        # for layer_num, scale, l2 in reg_layers:
+        #     p = 1 + l2
+        #     for W in model[layer_num].parameters():
+        #         reg_loss = reg_loss + (W.norm(p) ** p)
+        #     reg_loss = reg_loss.sqrt()
+        #     reg_loss *= scale
 
-        return
+
+
+
+
+
+
 
 
 

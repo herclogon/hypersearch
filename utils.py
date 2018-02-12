@@ -38,7 +38,7 @@ def sample_from(space):
     if log:
         samp = np.exp(samp)
     if quantized:
-        samp = (samp / space[3]) * space[3]
+        samp = round((samp / space[3]) * space[3])
     return samp
 
 
