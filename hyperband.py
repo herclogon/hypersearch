@@ -301,7 +301,6 @@ class Hyperband(object):
                 layer_num += (layer_num // 2) * (
                     self.all_batchnorm + self.all_drop
                 )
-                layer_num = str(layer_num)
                 l2_reg = True
                 if k.split('_', 1)[1] == "l1":
                     l2_reg = False
@@ -311,6 +310,26 @@ class Hyperband(object):
             else:
                 pass
         return reg_layers
+
+    def get_reg_loss(self, model, reg_layers):
+        """
+        Compute the regularization loss of the model layers
+        as defined by reg_layers.
+        """
+        reg_loss = Variable(torch.FloatTensor(1), requires_grad=True)
+        for layer_num, scale, l2 in reg_layers:
+            l1_loss = Variable(torch.FloatTensor(1), requires_grad=True)
+            l2_loss = Variable(torch.FloatTensor(1), requires_grad=True)
+            if l2:
+                for W in model[layer_num].parameters():
+                    l2_loss = l2_loss + (W.norm(2) ** 2)
+                l2_loss = l2_loss.sqrt()
+            else:
+                for W in model[layer_num].parameters():
+                    l1_loss = l1_loss + W.norm(1)
+                l1_loss = l1_loss / 2
+            reg_loss = reg_loss + ((l1_loss + l2_loss) * scale)
+        return reg_loss
 
     def run_config(self, model, num_iters):
         """
@@ -333,14 +352,9 @@ class Hyperband(object):
         """
         # compute regularizer loss
         reg_layers = self.add_regularization(model)
-        print(reg_layers)
-        # reg_loss = Variable(torch.FloatTensor(1), requires_grad=True)
-        # for layer_num, scale, l2 in reg_layers:
-        #     p = 1 + l2
-        #     for W in model[layer_num].parameters():
-        #         reg_loss = reg_loss + (W.norm(p) ** p)
-        #     reg_loss = reg_loss.sqrt()
-        #     reg_loss *= scale
+
+        reg_loss = self.get_reg_loss(model, reg_layers)
+        print(reg_loss.data)
 
 
 
