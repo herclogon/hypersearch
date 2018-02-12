@@ -16,13 +16,10 @@ name = 'mnist'
 
 def main():
 
-    # # ensure reproducibility
-    # torch.manual_seed(random_seed)
+    # create data loader
     kwargs = {}
     if use_gpu:
-        # torch.cuda.manual_seed(random_seed)
         kwargs = {'num_workers': 1, 'pin_memory': True}
-
     data_loader = get_train_valid_loader(
         data_dir, name, batch_size, random_seed,
         valid_size, shuffle, **kwargs
@@ -57,12 +54,11 @@ def main():
     }
 
     # instantiate hyperband object
-    hyperband = Hyperband(model, params, data_loader)
+    hyperband = Hyperband(model, params, data_loader, use_gpu)
 
     # tune
     hyperband.tune()
 
-    print(model)
 
 if __name__ == '__main__':
     main()

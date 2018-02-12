@@ -1,6 +1,5 @@
 import numpy as np
 
-from collections import OrderedDict
 from utils import sample_from, str2act, find_key
 
 import torch
@@ -27,6 +26,7 @@ class Hyperband(object):
                  model,
                  params,
                  data_loader,
+                 use_gpu,
                  max_iter=81,
                  eta=4,
                  epoch_scale=True):
@@ -105,24 +105,19 @@ class Hyperband(object):
             r = self.max_iter * self.eta ** (-s)
 
             # finite horizon SH with (n, r)
-            # T = [self.get_random_config() for i in range(n)]
+            T = [self.get_random_config() for i in range(n)]
 
-            # for i in range(s + 1):
-            #     n_i = n * self.eta ** (-i)
-            #     r_i = r * self.eta ** (i)
+            for i in range(s + 1):
+                n_i = n * self.eta ** (-i)
+                r_i = r * self.eta ** (i)
 
-            #     # run each of the n_i configs for r_i iterations
-            #     val_losses = [self.run_config(t, r_i) for t in T]
+                # run each of the n_i configs for r_i iterations
+                val_losses = [self.run_config(t, r_i) for t in T]
 
-            #     # keep the best n_i / eta
-            #     T = [
-            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-            #     ]
-
-
-        model = self.get_random_config()
-        print(model)
-        self.run_config(model, 1)
+                # keep the best n_i / eta
+                T = [
+                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+                ]
 
     def get_random_config(self):
         """
@@ -287,7 +282,7 @@ class Hyperband(object):
 
         return nn.Sequential(*layers)
 
-    def add_regularization(self, model):
+    def _add_regularization(self, model):
         """
         Setup regularization on model layers based
         on parameter dictionary.
@@ -311,7 +306,7 @@ class Hyperband(object):
                 pass
         return reg_layers
 
-    def get_reg_loss(self, model, reg_layers):
+    def _get_reg_loss(self, model, reg_layers):
         """
         Compute the regularization loss of the model layers
         as defined by reg_layers.
@@ -342,7 +337,7 @@ class Hyperband(object):
 
         Args
         ----
-        - model: 
+        - model: [...]
         - num_iters: an int indicating the number of iterations
           to train the model for.
 
@@ -350,21 +345,8 @@ class Hyperband(object):
         -------
         - val_losses: [...]
         """
-        # compute regularizer loss
-        reg_layers = self.add_regularization(model)
+        # parse reg params
+        reg_layers = self._add_regularization(model)
 
-        reg_loss = self.get_reg_loss(model, reg_layers)
-        print(reg_loss.data)
-
-
-
-
-
-
-
-
-
-
-
-
-
+        # get regularization loss
+        reg_loss = self._get_reg_loss(model, reg_layers)
