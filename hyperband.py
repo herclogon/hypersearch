@@ -41,6 +41,7 @@ class Hyperband(object):
           sample it.
         - data_loader: a tuple containing train and valid iterators
           over the desired dataset.
+        - use_gpu: bool inidicating whether to use the GPU.
         - max_iter: maximum amount of iterations that
           you are willing to allocate to a single
           configuration.
@@ -58,6 +59,7 @@ class Hyperband(object):
 
         self.model = model
         self.data_loader = data_loader
+        self.use_gpu = use_gpu
 
         self._parse_params(params)
 

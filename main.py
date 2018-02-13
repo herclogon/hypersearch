@@ -5,12 +5,11 @@ from hyperband import Hyperband
 from data_loader import get_train_valid_loader
 
 
-random_seed = 42424
 use_gpu = False
 data_dir = './data/'
 batch_size = 64
 valid_size = 0.1
-shuffle = True
+shuffle = False
 name = 'mnist'
 
 
@@ -20,8 +19,9 @@ def main():
     kwargs = {}
     if use_gpu:
         kwargs = {'num_workers': 1, 'pin_memory': True}
+
     data_loader = get_train_valid_loader(
-        data_dir, name, batch_size, random_seed,
+        data_dir, name, batch_size,
         valid_size, shuffle, **kwargs
     )
 

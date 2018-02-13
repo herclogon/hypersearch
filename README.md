@@ -9,15 +9,18 @@
     - [x] all
     - [x] per layer
 - [x] Add Batch Norm
-    - [x] sandwiched between ever layer
+    - [x] sandwiched between every layer
 - [x] Add Dropout
-    - [x] sandwiched between ever layer
-- [x] Change Hidden Layer Size
+    - [x] sandwiched between every layer
+- [ ] Add Layers
+    - [ ] Conv Layers
+    - [ ] FC Layers
+- [ ] Change Layer Params
+    - [x] change FC output size
+    - [ ] change Conv # filters
+    - [ ] change Conv filter size
 - [x] Optimizer
 - [x] Learning Rate
-- [x] Momentum
-- [x] Batch Size
-
 
 ## Order of Params
 

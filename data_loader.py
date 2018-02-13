@@ -10,7 +10,6 @@ from torch.utils.data.sampler import SubsetRandomSampler
 def get_train_valid_loader(data_dir,
                            name,
                            batch_size,
-                           random_seed,
                            valid_size=0.1,
                            shuffle=True,
                            num_workers=4,
@@ -25,7 +24,6 @@ def get_train_valid_loader(data_dir,
     - name: string specifying which dataset to load. Can be `mnist`,
       `cifar10`, `cifar100`.
     - batch_size: how many samples per batch to load.
-    - random_seed: fix seed for reproducibility.
     - valid_size: percentage split of the training set used for
       the validation set. Should be a float in the range [0, 1].
       In the paper, this number is set to 0.1.
@@ -100,7 +98,8 @@ def get_train_valid_loader(data_dir,
     split = int(np.floor(valid_size * num_train))
 
     if shuffle:
-        np.random.seed(random_seed)
+        seed = 786427186
+        np.random.seed(seed)
         np.random.shuffle(indices)
 
     train_idx, valid_idx = indices[split:], indices[:split]
