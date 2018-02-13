@@ -16,12 +16,11 @@
 - [x] Add Dropout
     - [x] sandwiched between every layer
 - [ ] Add Layers
-    - [ ] Conv Layers
-    - [ ] FC Layers
+    - [ ] conv Layers
+    - [ ] fc Layers
 - [ ] Change Layer Params
-    - [x] change FC output size
-    - [ ] change Conv # filters
-    - [ ] change Conv filter size
+    - [x] change fc output size
+    - [ ] change conv params
 - [x] Optimizer
 - [x] Learning Rate
 

@@ -106,24 +106,20 @@ class Hyperband(object):
             # initial number of iterations to run the n configs for
             r = self.max_iter * self.eta ** (-s)
 
-            # # finite horizon SH with (n, r)
-            # T = [self.get_random_config() for i in range(n)]
+            # finite horizon SH with (n, r)
+            T = [self.get_random_config() for i in range(n)]
 
-            # for i in range(s + 1):
-            #     n_i = n * self.eta ** (-i)
-            #     r_i = r * self.eta ** (i)
+            for i in range(s + 1):
+                n_i = n * self.eta ** (-i)
+                r_i = r * self.eta ** (i)
 
-            #     # run each of the n_i configs for r_i iterations
-            #     val_losses = [self.run_config(t, r_i) for t in T]
+                # run each of the n_i configs for r_i iterations
+                val_losses = [self.run_config(t, r_i) for t in T]
 
-            #     # keep the best n_i / eta
-            #     T = [
-            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-            #     ]
-
-        model = self.get_random_config()
-        print(model)
-        self.run_config(model, 1)
+                # keep the best n_i / eta
+                T = [
+                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+                ]
 
     def get_random_config(self):
         """
@@ -375,8 +371,6 @@ class Hyperband(object):
         """
         # parse reg params
         reg_layers = self._add_regularization(model)
-
-        print(reg_layers)
 
         # get regularization loss
         reg_loss = self._get_reg_loss(model, reg_layers)
