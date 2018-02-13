@@ -1,5 +1,8 @@
 [WIP]
 
+v1 support: fc networks
+v2 support: conv networks
+
 ## Supported Hyperparameters
 
 - [x] Activation

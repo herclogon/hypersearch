@@ -106,20 +106,24 @@ class Hyperband(object):
             # initial number of iterations to run the n configs for
             r = self.max_iter * self.eta ** (-s)
 
-            # finite horizon SH with (n, r)
-            T = [self.get_random_config() for i in range(n)]
+            # # finite horizon SH with (n, r)
+            # T = [self.get_random_config() for i in range(n)]
 
-            for i in range(s + 1):
-                n_i = n * self.eta ** (-i)
-                r_i = r * self.eta ** (i)
+            # for i in range(s + 1):
+            #     n_i = n * self.eta ** (-i)
+            #     r_i = r * self.eta ** (i)
 
-                # run each of the n_i configs for r_i iterations
-                val_losses = [self.run_config(t, r_i) for t in T]
+            #     # run each of the n_i configs for r_i iterations
+            #     val_losses = [self.run_config(t, r_i) for t in T]
 
-                # keep the best n_i / eta
-                T = [
-                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-                ]
+            #     # keep the best n_i / eta
+            #     T = [
+            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+            #     ]
+
+        model = self.get_random_config()
+        print(model)
+        self.run_config(model, 1)
 
     def get_random_config(self):
         """
@@ -284,20 +288,42 @@ class Hyperband(object):
 
         return nn.Sequential(*layers)
 
+    def _check_bn_drop(self, model):
+        names = []
+        count = 0
+        for layer in model.named_children():
+            names.append(layer[1].__str__().split("(")[0])
+        names = list(set(names))
+        if any("Dropout" in s for s in names):
+            count += 1
+        if any("BatchNorm" in s for s in names):
+            count += 1
+        return count
+
     def _add_regularization(self, model):
         """
         Setup regularization on model layers based
         on parameter dictionary.
         """
+        offset = self._check_bn_drop(model)
         reg_layers = []
         for k in self.reg_params.keys():
             if k in ["all_l2", "all_l1"]:
-                reg_layers.append('all')
+                l2_reg = False
+                if k == "all_l2":
+                    l2_reg = True
+                num_lin_layers = int(
+                    ((len(self.model) - 2) / 2) + 1
+                )
+                j = 0
+                for i in range(num_lin_layers):
+                    space = self.reg_params[k]
+                    hyperp = sample_from(space)
+                    reg_layers.append((j, hyperp, l2_reg))
+                    j += 2 + offset
             elif k.split('_', 1)[1] in ["l2", "l1"]:
                 layer_num = int(k.split('_', 1)[0])
-                layer_num += (layer_num // 2) * (
-                    self.all_batchnorm + self.all_drop
-                )
+                layer_num += (layer_num // 2) * (offset)
                 l2_reg = True
                 if k.split('_', 1)[1] == "l1":
                     l2_reg = False
@@ -349,6 +375,8 @@ class Hyperband(object):
         """
         # parse reg params
         reg_layers = self._add_regularization(model)
+
+        print(reg_layers)
 
         # get regularization loss
         reg_loss = self._get_reg_loss(model, reg_layers)
