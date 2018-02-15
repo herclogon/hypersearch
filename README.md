@@ -28,6 +28,6 @@
     - [x] change fc output size
     - [ ] change conv params
 - [ ] Optimization
-    - [ ] batch size
+    - [x] batch size
     - [x] learning rate
     - [x] optimizer (adam, sgd)
