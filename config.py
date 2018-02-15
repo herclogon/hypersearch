@@ -36,10 +36,17 @@ data_arg.add_argument('--num_workers', type=int, default=4,
 data_arg.add_argument('--shuffle', type=str2bool, default=False,
                       help='Whether to shuffle the train and valid indices')
 
+# optim params
+train_arg = add_argument_group('Optim Params')
+train_arg.add_argument('--def_lr', type=float, default=1e-3,
+                       help='Default lr')
+train_arg.add_argument('--def_optim', type=str, default='adam',
+                       help='Default optimizer')
+
 # misc params
 misc_arg = add_argument_group('Misc.')
-misc_arg.add_argument('--use_gpu', type=str2bool, default=False,
-                      help="Whether to run on the GPU")
+misc_arg.add_argument('--num_gpu', type=int, default=0,
+                      help='0 for cpu, greater for gpu')
 misc_arg.add_argument('--data_dir', type=str, default='./data/',
                       help='Directory in which data is stored')
 misc_arg.add_argument('--ckpt_dir', type=str, default='./ckpt/',
@@ -48,6 +55,6 @@ misc_arg.add_argument('--print_freq', type=int, default=10,
                       help='How frequently to print training details')
 
 
-def get_config():
-    config, unparsed = parser.parse_known_args()
-    return config, unparsed
+def get_args():
+    args, unparsed = parser.parse_known_args()
+    return args, unparsed

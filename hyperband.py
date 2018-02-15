@@ -6,6 +6,7 @@ from utils import sample_from, str2act, find_key
 import torch
 import torch.nn as nn
 
+from torch.optim import SGD, Adam
 from torch.autograd import Variable
 
 
@@ -23,43 +24,47 @@ class Hyperband(object):
     ----------
     - [1]: Li et. al., https://arxiv.org/abs/1603.06560
     """
-    def __init__(self, config, model, params):
+    def __init__(self, args, model, params):
         """
         Initialize the Hyperband object.
 
         Args
         ----
-        - config: object containing command line arguments.
+        - args: object containing command line arguments.
         - model: the `Sequential()` model you wish to tune.
         - params: a dictionary where the key is the hyperparameter
           to tune, and the value is the space from which to randomly
           sample it.
         """
-        self.config = config
+        self.args = args
+        self.model = model
+        self._parse_params(params)
 
         # hyperband params
-        self.epoch_scale = config.epoch_scale
-        self.max_iter = config.max_iter
-        self.eta = config.eta
+        self.epoch_scale = args.epoch_scale
+        self.max_iter = args.max_iter
+        self.eta = args.eta
         self.s_max = int(np.log(self.max_iter) / np.log(self.eta))
         self.B = (self.s_max+1) * self.max_iter
 
         # misc params
-        self.use_gpu = config.use_gpu
-        self.print_freq = config.print_freq
+        self.num_gpu = args.num_gpu
+        self.print_freq = args.print_freq
 
-        # data params
-        kwargs = {}
-        if self.use_gpu:
-            kwargs = {'num_workers': 1, 'pin_memory': True}
+        # optim params
+        self.def_optim = args.def_optim
+        self.def_lr = args.def_lr
 
-        self.data_loader = get_train_valid_loader(
-            config.data_dir, config.name, config.batch_size,
-            config.valid_size, config.shuffle, **kwargs
-        )
-
-        self.model = model
-        self._parse_params(params)
+        # create dataloader once if `batchsize` is not a hyperparam
+        self.data_loader = None
+        self.kwargs = {}
+        if self.num_gpu > 0:
+            self.kwargs = {'num_workers': 1, 'pin_memory': True}
+        if 'batchsize' not in self.optim_params:
+            self.data_loader = get_train_valid_loader(
+                args.data_dir, args.name, args.batch_size,
+                args.valid_size, args.shuffle, **self.kwargs
+            )
 
     def _parse_params(self, params):
         """
@@ -73,7 +78,7 @@ class Hyperband(object):
 
         size_filter = ["hidden"]
         net_filter = ["act", "dropout", "batchnorm"]
-        optim_filter = ["lr", "optim", "batchsize", "momentum"]
+        optim_filter = ["lr", "optim", "batchsize"]
         reg_filter = ["l2", "l1"]
 
         for k, v in params.items():
@@ -352,6 +357,25 @@ class Hyperband(object):
             reg_loss = reg_loss + ((l1_loss + l2_loss) * scale)
         return reg_loss
 
+    def _get_optimizer(self, model):
+        """
+        Setup optimizer and learning rate.
+        """
+        lr = self.def_lr
+        name = self.def_optim
+        if "optim" in self.optim_params:
+            space = self.optim_params['optim']
+            name = sample_from(space)
+        if "lr" in self.optim_params:
+            space = self.optim_params['lr']
+            lr = sample_from(space)
+        if name == "sgd":
+            opt = SGD
+        elif name == "adam":
+            opt = Adam
+        optim = opt(model.parameters(), lr=lr)
+        return optim
+
     def run_config(self, model, num_iters):
         """
         Train a particular hyperparameter configuration for a
@@ -377,10 +401,23 @@ class Hyperband(object):
         print(reg_layers)
 
         # make gpu
-        if self.use_gpu:
+        if self.num_gpu > 0:
             model = model.cuda()
 
         # setup optimizer
+        optim = self._get_optimizer(model)
+
+        # setup data loader
+        if self.data_loader is None:
+            space = self.optim_params['batchsize']
+            batch_size = sample_from(space)
+            self.data_loader = get_train_valid_loader(
+                self.args.data_dir, self.args.name,
+                batch_size, self.args.valid_size,
+                self.args.shuffle, **self.kwargs
+            )
+
+        print(self.data_loader[0].batch_size)
 
         # get regularization loss
         reg_loss = self._get_reg_loss(model, reg_layers)

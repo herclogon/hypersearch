@@ -7,6 +7,7 @@
 
 - [ ] setup checkpointing
 - [ ] train loop
+- [ ] multi-gpu support
 
 ## Supported Hyperparameters
 
@@ -26,13 +27,7 @@
 - [ ] Change Layer Params
     - [x] change fc output size
     - [ ] change conv params
-- [x] Optimizer
-- [x] Learning Rate
-
-## Order of Params
-
-`conv/fc -> ReLU -> Batch Norm -> Dropout`
-
-## Default
-
-- optimizer: `Adam(lr=1e-3)`
+- [ ] Optimization
+    - [ ] batch size
+    - [x] learning rate
+    - [x] optimizer (adam, sgd)
