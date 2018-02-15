@@ -1,41 +1,21 @@
-import torch.nn as nn
-
+from config import get_config
+from utils import prepare_dirs
 from hyperband import Hyperband
-from data_loader import get_train_valid_loader
+from model import get_base_model
 
 
-use_gpu = False
-data_dir = './data/'
-batch_size = 64
-valid_size = 0.1
-shuffle = False
-name = 'mnist'
+def main(config):
 
+    # ensure directories are setup
+    dirs = [config.data_dir, config.ckpt_dir]
+    prepare_dirs(dirs)
 
-def main():
+    # create base model
+    model = get_base_model()
 
-    # create data loader
-    kwargs = {}
-    if use_gpu:
-        kwargs = {'num_workers': 1, 'pin_memory': True}
+    print(model)
 
-    data_loader = get_train_valid_loader(
-        data_dir, name, batch_size,
-        valid_size, shuffle, **kwargs
-    )
-
-    # create model
-    layers = []
-    layers.append(nn.Linear(784, 512))
-    layers.append(nn.ReLU())
-    layers.append(nn.Linear(512, 256))
-    layers.append(nn.ReLU())
-    layers.append(nn.Linear(256, 128))
-    layers.append(nn.ReLU())
-    layers.append(nn.Linear(256, 10))
-    layers.append(nn.Softmax(dim=1))
-    model = nn.Sequential(*layers)
-
+    # define params
     params = {
         # '0_dropout': ['uniform', 0.1, 0.5],
         # '0_act': ['choice', ['relu', 'selu', 'elu', 'tanh', 'sigmoid']],
@@ -53,11 +33,12 @@ def main():
     }
 
     # instantiate hyperband object
-    hyperband = Hyperband(model, params, data_loader, use_gpu)
+    hyperband = Hyperband(config, model, params)
 
     # tune
     hyperband.tune()
 
 
 if __name__ == '__main__':
-    main()
+    config, unparsed = get_config()
+    main(config)

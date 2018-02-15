@@ -3,6 +3,11 @@
 * v1 support: fc networks
 * v2 support: conv networks
 
+## Todo
+
+- [ ] setup checkpointing
+- [ ] train loop
+
 ## Supported Hyperparameters
 
 - [x] Activation

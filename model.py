@@ -1,0 +1,19 @@
+import torch.nn as nn
+
+
+def get_base_model():
+
+    layers = []
+
+    layers.append(nn.Linear(784, 512))
+    layers.append(nn.ReLU())
+    layers.append(nn.Linear(512, 256))
+    layers.append(nn.ReLU())
+    layers.append(nn.Linear(256, 128))
+    layers.append(nn.ReLU())
+    layers.append(nn.Linear(256, 10))
+    layers.append(nn.Softmax(dim=1))
+
+    model = nn.Sequential(*layers)
+
+    return model

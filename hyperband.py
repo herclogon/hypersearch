@@ -1,5 +1,6 @@
 import numpy as np
 
+from data_loader import get_train_valid_loader
 from utils import sample_from, str2act, find_key
 
 import torch
@@ -22,45 +23,42 @@ class Hyperband(object):
     ----------
     - [1]: Li et. al., https://arxiv.org/abs/1603.06560
     """
-    def __init__(self,
-                 model,
-                 params,
-                 data_loader,
-                 use_gpu,
-                 max_iter=81,
-                 eta=4,
-                 epoch_scale=True):
+    def __init__(self, config, model, params):
         """
         Initialize the Hyperband object.
 
         Args
         ----
+        - config: object containing command line arguments.
         - model: the `Sequential()` model you wish to tune.
         - params: a dictionary where the key is the hyperparameter
           to tune, and the value is the space from which to randomly
           sample it.
-        - data_loader: a tuple containing train and valid iterators
-          over the desired dataset.
-        - use_gpu: bool inidicating whether to use the GPU.
-        - max_iter: maximum amount of iterations that
-          you are willing to allocate to a single
-          configuration.
-        - eta: proportion of configurations discarded
-          in each round of Successive Halving (SH).
-        - epoch_scale: if True, `max_iter` is computed in
-          terms of epochs, else in terms of iterations per
-          epoch.
         """
-        self.epoch_scale = epoch_scale
-        self.max_iter = max_iter
-        self.eta = eta
-        self.s_max = int(np.log(max_iter) / np.log(eta))
-        self.B = (self.s_max+1) * max_iter
+        self.config = config
+
+        # hyperband params
+        self.epoch_scale = config.epoch_scale
+        self.max_iter = config.max_iter
+        self.eta = config.eta
+        self.s_max = int(np.log(self.max_iter) / np.log(self.eta))
+        self.B = (self.s_max+1) * self.max_iter
+
+        # misc params
+        self.use_gpu = config.use_gpu
+        self.print_freq = config.print_freq
+
+        # data params
+        kwargs = {}
+        if self.use_gpu:
+            kwargs = {'num_workers': 1, 'pin_memory': True}
+
+        self.data_loader = get_train_valid_loader(
+            config.data_dir, config.name, config.batch_size,
+            config.valid_size, config.shuffle, **kwargs
+        )
 
         self.model = model
-        self.data_loader = data_loader
-        self.use_gpu = use_gpu
-
         self._parse_params(params)
 
     def _parse_params(self, params):
@@ -106,20 +104,24 @@ class Hyperband(object):
             # initial number of iterations to run the n configs for
             r = self.max_iter * self.eta ** (-s)
 
-            # finite horizon SH with (n, r)
-            T = [self.get_random_config() for i in range(n)]
+            # # finite horizon SH with (n, r)
+            # T = [self.get_random_config() for i in range(n)]
 
-            for i in range(s + 1):
-                n_i = n * self.eta ** (-i)
-                r_i = r * self.eta ** (i)
+            # for i in range(s + 1):
+            #     n_i = n * self.eta ** (-i)
+            #     r_i = r * self.eta ** (i)
 
-                # run each of the n_i configs for r_i iterations
-                val_losses = [self.run_config(t, r_i) for t in T]
+            #     # run each of the n_i configs for r_i iterations
+            #     val_losses = [self.run_config(t, r_i) for t in T]
 
-                # keep the best n_i / eta
-                T = [
-                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-                ]
+            #     # keep the best n_i / eta
+            #     T = [
+            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+            #     ]
+
+        new_model = self.get_random_config()
+        print(new_model)
+        self.run_config(new_model, 1)
 
     def get_random_config(self):
         """
@@ -296,7 +298,7 @@ class Hyperband(object):
             count += 1
         return count
 
-    def _add_regularization(self, model):
+    def _add_reg(self, model):
         """
         Setup regularization on model layers based
         on parameter dictionary.
@@ -370,7 +372,16 @@ class Hyperband(object):
         - val_losses: [...]
         """
         # parse reg params
-        reg_layers = self._add_regularization(model)
+        reg_layers = self._add_reg(model)
+
+        print(reg_layers)
+
+        # make gpu
+        if self.use_gpu:
+            model = model.cuda()
+
+        # setup optimizer
 
         # get regularization loss
         reg_loss = self._get_reg_loss(model, reg_layers)
+        print(reg_loss)

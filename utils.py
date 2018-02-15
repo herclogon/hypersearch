@@ -1,3 +1,4 @@
+import os
 import time
 import numpy as np
 
@@ -55,3 +56,9 @@ def str2act(a):
         return nn.Sigmoid()
     else:
         raise ValueError('[!] Unsupported activation.')
+
+
+def prepare_dirs(dirs):
+    for path in dirs:
+        if not os.path.exists(path):
+            os.makedirs(path)
