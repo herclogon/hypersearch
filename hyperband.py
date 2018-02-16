@@ -1,8 +1,10 @@
 import os
+import time
 import uuid
 import numpy as np
 
 from utils import *
+from tqdm import tqdm
 from data_loader import get_train_valid_loader
 
 import torch
@@ -49,6 +51,12 @@ class Hyperband(object):
         self.eta = args.eta
         self.s_max = int(np.log(self.max_iter) / np.log(self.eta))
         self.B = (self.s_max+1) * self.max_iter
+
+        print(
+            "[*] max_iter: {}, eta: {}, B: {}".format(
+                self.max_iter, self.eta, self.B
+            )
+        )
 
         # misc params
         self.data_dir = args.data_dir
@@ -104,6 +112,8 @@ class Hyperband(object):
         Tune the hyperparameters of the pytorch model
         using Hyperband.
         """
+        self.results = {}
+
         # finite horizon outerloop
         for s in reversed(range(self.s_max + 1)):
             # initial number of configs
@@ -115,23 +125,36 @@ class Hyperband(object):
             # initial number of iterations to run the n configs for
             r = self.max_iter * self.eta ** (-s)
 
-            # # finite horizon SH with (n, r)
-            # T = [self.get_random_config() for i in range(n)]
+            # finite horizon SH with (n, r)
+            T = [self.get_random_config() for i in range(n)]
 
-            # for i in range(s + 1):
-            #     n_i = n * self.eta ** (-i)
-            #     r_i = r * self.eta ** (i)
+            for i in range(s + 1):
+                n_i = n * self.eta ** (-i)
+                r_i = r * self.eta ** (i)
 
-            #     # run each of the n_i configs for r_i iterations
-            #     val_losses = [self.run_config(t, r_i) for t in T]
+                tqdm.write(
+                    "[*] running {} configs for {} iters each...".format(n_i, r_i)
+                )
 
-            #     # keep the best n_i / eta
-            #     T = [
-            #         T[i] for i in np.argsort(val_losses)[0:(n_i // self.eta)]
-            #     ]
+                # run each of the n_i configs for r_i iterations
+                val_losses = []
+                with tqdm(total=len(T)) as pbar:
+                    for t in T:
+                        val_loss = self.run_config(t, r_i)
+                        val_losses.append(val_loss)
+                        pbar.update(1)
 
-        new_model = self.get_random_config()
-        self.run_config(new_model, 5)
+                # remove early stopped configs and keep the best n_i / eta
+                T = [
+                    T[k] for k in np.argsort(val_losses) if val_losses[k] != 999999
+                ]
+                T = [
+                    T[k] for k in np.argsort(val_losses)[0:int(n_i / self.eta)]
+                ]
+
+            print(T)
+            print(val_losses)
+            # self.results[T]
 
     def get_random_config(self):
         """
@@ -414,12 +437,11 @@ class Hyperband(object):
 
         # parse reg params
         reg_layers = self._add_reg(model)
-        print(reg_layers)
 
         # training logic
-        min_val_loss = 0.
+        min_val_loss = 999999
         counter = 0
-        num_epochs = num_iters if self.epoch_scale else 1
+        num_epochs = int(num_iters) if self.epoch_scale else 1
         num_passes = None if self.epoch_scale else num_iters
         for epoch in range(num_epochs):
             self._train_one_epoch(model, num_passes, reg_layers)
@@ -430,12 +452,7 @@ class Hyperband(object):
             else:
                 counter += 1
             if counter > self.patience:
-                state = {
-                    'state_dict': model.state_dict(),
-                    'min_val_loss': min_val_loss,
-                }
-                self._save_checkpoint(state, model.ckpt_name)
-                return min_val_loss
+                return 999999
         state = {
             'state_dict': model.state_dict(),
             'min_val_loss': min_val_loss,
@@ -453,6 +470,8 @@ class Hyperband(object):
         If `num_passes` is not None, the model is trained for
         `num_passes` mini-batch iterations.
         """
+        model.train()
+
         # setup optimizer
         optim = self._get_optimizer(model)
 
@@ -466,6 +485,7 @@ class Hyperband(object):
                 self.args.shuffle, **self.kwargs
             )
         train_loader = self.data_loader[0]
+        num_train = len(train_loader.sampler.indices)
 
         for i, (x, y) in enumerate(train_loader):
             if num_passes is not None:
@@ -473,7 +493,8 @@ class Hyperband(object):
                     return
             if self.num_gpu > 0:
                 x, y = x.cuda(), y.cuda()
-            x = x.view(x.size(0), -1)
+            batch_size = x.shape[0]
+            x = x.view(batch_size, -1)
             x, y = Variable(x), Variable(y)
             optim.zero_grad()
             output = model(x)
@@ -481,13 +502,14 @@ class Hyperband(object):
             reg_loss = self._get_reg_loss(model, reg_layers)
             comp_loss = loss + reg_loss
             comp_loss.backward()
-            print(comp_loss)
             optim.step()
 
     def _validate_one_epoch(self, model):
         """
         Evaluate the model on the validation set.
         """
+        model.eval()
+
         # setup valid loader
         if self.data_loader is None:
             space = self.optim_params['batch_size']
@@ -498,17 +520,17 @@ class Hyperband(object):
                 self.args.shuffle, **self.kwargs
             )
         val_loader = self.data_loader[1]
+        num_valid = len(val_loader.sampler.indices)
 
         val_loss = 0.
         for i, (x, y) in enumerate(val_loader):
-            if self.use_gpu:
+            if self.num_gpu > 0:
                 x, y = x.cuda(), y.cuda()
             x = x.view(x.size(0), -1)
             x, y = Variable(x), Variable(y)
             output = model(x)
             val_loss += F.nll_loss(output, y, size_average=False).data[0]
 
-        num_valid = len(val_loader.sampler.indices)
         val_loss /= num_valid
         return val_loss
 
@@ -524,7 +546,7 @@ class Hyperband(object):
         """
         Load the latest model checkpoint.
         """
-        filename = name + 'pth.tar'
+        filename = name + '.pth.tar'
         ckpt_path = os.path.join(self.ckpt_dir, filename)
         ckpt = torch.load(ckpt_path)
         return ckpt

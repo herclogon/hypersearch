@@ -1,14 +1,22 @@
 [WIP]
 
-* v1 support: fc networks
-* v2 support: conv networks
+- [x] v1 support: fc networks
+- [ ] v2 support: conv networks
+
+## Restrictions
+
+* Only fully-connected networks currently supported
+* You need to define the model using `nn.Sequential` in `model.py`
+* Make sure the training loop `train_one_epoch()` fits your need:
+    * the correct loss is being computed. The default one is currently `F.nll_loss`
 
 ## Todo
 
 - [x] setup checkpointing
 - [x] train loop
 - [x] < 1 epoch support
-- [ ] visualization support
+- [x] filter out early stopping configs
+- [ ] visualization + logging support
 - [ ] multi-gpu support
 
 ## Supported Hyperparameters
