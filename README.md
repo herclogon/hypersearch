@@ -5,8 +5,9 @@
 
 ## Todo
 
-- [ ] setup checkpointing
+- [x] setup checkpointing
 - [ ] train loop
+- [ ] < 1 epoch support
 - [ ] multi-gpu support
 
 ## Supported Hyperparameters

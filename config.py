@@ -21,7 +21,7 @@ hyper_arg.add_argument('--max_iter', type=int, default=81,
 hyper_arg.add_argument('--eta', type=int, default=81,
                        help='Prop of configs discarded in each round of SH')
 hyper_arg.add_argument('--epoch_scale', type=str2bool, default=True,
-                       help='Compute `max_iter` in terms of epochs or iters')
+                       help='Compute `max_iter` in terms of epochs or mini-batch iters')
 
 # data params
 data_arg = add_argument_group('Data Params')
