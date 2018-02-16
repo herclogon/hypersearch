@@ -1,5 +1,7 @@
 import torch.nn as nn
 
+from utils import Reshape
+
 
 def get_base_model():
 
@@ -12,7 +14,7 @@ def get_base_model():
     layers.append(nn.Linear(256, 128))
     layers.append(nn.ReLU())
     layers.append(nn.Linear(256, 10))
-    layers.append(nn.Softmax(dim=1))
+    layers.append(nn.LogSoftmax(dim=1))
 
     model = nn.Sequential(*layers)
 

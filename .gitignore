@@ -1,6 +1,7 @@
 *.ipynb
 .DS_Store
 /data/
+/ckpt/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

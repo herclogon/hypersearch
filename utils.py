@@ -62,3 +62,33 @@ def prepare_dirs(dirs):
     for path in dirs:
         if not os.path.exists(path):
             os.makedirs(path)
+
+
+class Reshape(nn.Module):
+    def __init__(self, *args):
+        super(Reshape, self).__init__()
+        self.shape = args
+
+    def forward(self, x):
+        return x.view(self.shape, -1)
+
+
+class AverageMeter(object):
+    """
+    Computes and stores the average and
+    current value.
+    """
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

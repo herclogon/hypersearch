@@ -14,6 +14,8 @@ def main(args):
     # create base model
     model = get_base_model()
 
+    print(model)
+
     # define params
     params = {
         # '0_dropout': ['uniform', 0.1, 0.5],
