@@ -42,6 +42,8 @@ train_arg.add_argument('--def_lr', type=float, default=1e-3,
                        help='Default lr')
 train_arg.add_argument('--def_optim', type=str, default='adam',
                        help='Default optimizer')
+train_arg.add_argument('--patience', type=int, default=5,
+                       help='# of epochs to wait before early stopping')
 
 # misc params
 misc_arg = add_argument_group('Misc.')

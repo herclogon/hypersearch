@@ -13,7 +13,6 @@ def main(args):
 
     # create base model
     model = get_base_model()
-    print(model)
 
     # define params
     params = {
@@ -30,7 +29,7 @@ def main(args):
         'all_l2': ['uniform', 1e-8, 1e-5],
         'optim': ['choice', ["adam", "sgd"]],
         'lr': ['uniform', 1e-3, 8e-3],
-        'batchsize': ['quniform', 32, 128, 1]
+        'batch_size': ['quniform', 32, 128, 1]
     }
 
     # instantiate hyperband object

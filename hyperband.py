@@ -51,11 +51,7 @@ class Hyperband(object):
         self.num_gpu = args.num_gpu
         self.print_freq = args.print_freq
 
-        # optim params
-        self.def_optim = args.def_optim
-        self.def_lr = args.def_lr
-
-        # create dataloader once if `batchsize` is not a hyperparam
+        # data params
         self.data_loader = None
         self.kwargs = {}
         if self.num_gpu > 0:
@@ -65,6 +61,11 @@ class Hyperband(object):
                 args.data_dir, args.name, args.batch_size,
                 args.valid_size, args.shuffle, **self.kwargs
             )
+
+        # optim params
+        self.def_optim = args.def_optim
+        self.def_lr = args.def_lr
+        self.patience = args.patience
 
     def _parse_params(self, params):
         """
@@ -78,7 +79,7 @@ class Hyperband(object):
 
         size_filter = ["hidden"]
         net_filter = ["act", "dropout", "batchnorm"]
-        optim_filter = ["lr", "optim", "batchsize"]
+        optim_filter = ["lr", "optim", "batch_size"]
         reg_filter = ["l2", "l1"]
 
         for k, v in params.items():
@@ -109,24 +110,22 @@ class Hyperband(object):
             # initial number of iterations to run the n configs for
             r = self.max_iter * self.eta ** (-s)
 
-            # # finite horizon SH with (n, r)
-            # T = [self.get_random_config() for i in range(n)]
+            # finite horizon SH with (n, r)
+            T = [self.get_random_config() for i in range(n)]
 
-            # for i in range(s + 1):
-            #     n_i = n * self.eta ** (-i)
-            #     r_i = r * self.eta ** (i)
+            for i in range(s + 1):
+                n_i = n * self.eta ** (-i)
+                r_i = r * self.eta ** (i)
 
-            #     # run each of the n_i configs for r_i iterations
-            #     val_losses = [self.run_config(t, r_i) for t in T]
+                # run each of the n_i configs for r_i iterations
+                val_losses = [self.run_config(t, r_i) for t in T]
 
-            #     # keep the best n_i / eta
-            #     T = [
-            #         T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
-            #     ]
-
-        new_model = self.get_random_config()
-        print(new_model)
-        self.run_config(new_model, 1)
+                # keep the best n_i / eta
+                T = [
+                    T[i] for i in np.argsort(val_losses)[0:int(n_i / self.eta)]
+                ]
+        # new_model = self.get_random_config()
+        # self.run_config(new_model, 1)
 
     def get_random_config(self):
         """
@@ -393,12 +392,10 @@ class Hyperband(object):
 
         Returns
         -------
-        - val_losses: [...]
+        - val_loss:
         """
         # parse reg params
         reg_layers = self._add_reg(model)
-
-        print(reg_layers)
 
         # make gpu
         if self.num_gpu > 0:
@@ -409,7 +406,7 @@ class Hyperband(object):
 
         # setup data loader
         if self.data_loader is None:
-            space = self.optim_params['batchsize']
+            space = self.optim_params['batch_size']
             batch_size = sample_from(space)
             self.data_loader = get_train_valid_loader(
                 self.args.data_dir, self.args.name,
@@ -417,8 +414,301 @@ class Hyperband(object):
                 self.args.shuffle, **self.kwargs
             )
 
-        print(self.data_loader[0].batch_size)
+        # load the most recent checkpoint
+        if self.resume:
+            self._load_checkpoint(best=False)
+
+        for epoch in range(num_iters):
+
+            # train for 1 epoch
+            train_loss, train_acc = self.train_one_epoch(epoch)
+
+            # evaluate on validation set
+            valid_loss, valid_acc = self.validate(epoch)
+
+            # check for improvement
+            if not is_best:
+                self.counter += 1
+            if self.counter > self.patience:
+                print("[!] No improvement in a while, stopping training.")
+                return
+
+    def train_one_epoch(self, epoch):
+        """
+        Train the model for 1 epoch of the training set.
+
+        An epoch corresponds to one full pass through the entire
+        training set in successive mini-batches.
+        """
+        batch_time = AverageMeter()
+        losses = AverageMeter()
+        accs = AverageMeter()
 
         # get regularization loss
         reg_loss = self._get_reg_loss(model, reg_layers)
-        print(reg_loss)
+
+        tic = time.time()
+        with tqdm(total=self.num_train) as pbar:
+            for i, (x, y) in enumerate(self.train_loader):
+                if self.use_gpu:
+                    x, y = x.cuda(), y.cuda()
+                x, y = Variable(x), Variable(y)
+
+                plot = False
+                if (epoch % self.plot_freq == 0) and (i == 0):
+                    plot = True
+
+                # initialize location vector and hidden state
+                self.batch_size = x.shape[0]
+                h_t, l_t = self.reset()
+
+                # save images
+                imgs = []
+                imgs.append(x[0:9])
+
+                # extract the glimpses
+                locs = []
+                log_pi = []
+                baselines = []
+                for t in range(self.num_glimpses - 1):
+
+                    # forward pass through model
+                    h_t, l_t, b_t, p = self.model(x, l_t, h_t)
+
+                    # store
+                    locs.append(l_t[0:9])
+                    baselines.append(b_t)
+                    log_pi.append(p)
+
+                # last iteration
+                h_t, l_t, b_t, log_probas, p = self.model(
+                    x, l_t, h_t, last=True
+                )
+                log_pi.append(p)
+                baselines.append(b_t)
+                locs.append(l_t[0:9])
+
+                # convert list to tensors and reshape
+                baselines = torch.stack(baselines).transpose(1, 0)
+                log_pi = torch.stack(log_pi).transpose(1, 0)
+
+                # calculate reward
+                predicted = torch.max(log_probas, 1)[1]
+                R = (predicted.detach() == y).float()
+                R = R.unsqueeze(1).repeat(1, self.num_glimpses)
+
+                # compute losses for differentiable modules
+                loss_action = F.nll_loss(log_probas, y)
+                loss_baseline = F.mse_loss(baselines, R)
+
+                # compute reinforce loss
+                adjusted_reward = R - baselines.detach()
+                loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+
+                # sum up into a hybrid loss
+                loss = loss_action + loss_baseline + loss_reinforce
+
+                # compute accuracy
+                correct = (predicted == y).float()
+                acc = 100 * (correct.sum() / len(y))
+
+                # store
+                losses.update(loss.data[0], x.size()[0])
+                accs.update(acc.data[0], x.size()[0])
+
+                # a = list(self.model.sensor.parameters())[0].clone()
+                # self.optimizer.zero_grad()
+                # loss_reinforce.backward()
+                # self.optimizer.step()
+                # b = list(self.model.sensor.parameters())[0].clone()
+                # print("Same: {}".format(torch.equal(a.data, b.data)))
+
+                # compute gradients and update SGD
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                # measure elapsed time
+                toc = time.time()
+                batch_time.update(toc-tic)
+
+                pbar.set_description(
+                    (
+                        "{:.1f}s - loss: {:.3f} - acc: {:.3f}".format(
+                            (toc-tic), loss.data[0], acc.data[0]
+                            )
+                    )
+                )
+                pbar.update(self.batch_size)
+
+                # dump the glimpses and locs
+                if plot:
+                    imgs = [g.data.numpy().squeeze() for g in imgs]
+                    locs = [l.data.numpy() for l in locs]
+                    pickle.dump(
+                        imgs, open(
+                            self.plot_dir + "g_{}.p".format(epoch+1),
+                            "wb"
+                        )
+                    )
+                    pickle.dump(
+                        locs, open(
+                            self.plot_dir + "l_{}.p".format(epoch+1),
+                            "wb"
+                        )
+                    )
+
+                # log to tensorboard
+                if self.use_tensorboard:
+                    iteration = epoch*len(self.train_loader) + i
+                    log_value('train_loss', losses.avg, iteration)
+                    log_value('train_acc', accs.avg, iteration)
+
+            return losses.avg, accs.avg
+
+    def validate(self, epoch):
+        """
+        Evaluate the model on the validation set.
+        """
+        losses = AverageMeter()
+        accs = AverageMeter()
+
+        for i, (x, y) in enumerate(self.valid_loader):
+            if self.use_gpu:
+                x, y = x.cuda(), y.cuda()
+            x, y = Variable(x), Variable(y)
+
+            # duplicate 10 times
+            x = x.repeat(self.M, 1, 1, 1)
+
+            # initialize location vector and hidden state
+            self.batch_size = x.shape[0]
+            h_t, l_t = self.reset()
+
+            # extract the glimpses
+            log_pi = []
+            baselines = []
+            for t in range(self.num_glimpses - 1):
+
+                # forward pass through model
+                h_t, l_t, b_t, p = self.model(x, l_t, h_t)
+
+                # store
+                baselines.append(b_t)
+                log_pi.append(p)
+
+            # last iteration
+            h_t, l_t, b_t, log_probas, p = self.model(
+                x, l_t, h_t, last=True
+            )
+            log_pi.append(p)
+            baselines.append(b_t)
+
+            # convert list to tensors and reshape
+            baselines = torch.stack(baselines).transpose(1, 0)
+            log_pi = torch.stack(log_pi).transpose(1, 0)
+
+            # average
+            log_probas = log_probas.view(
+                self.M, -1, log_probas.shape[-1]
+            )
+            log_probas = torch.mean(log_probas, dim=0)
+
+            baselines = baselines.contiguous().view(
+                self.M, -1, baselines.shape[-1]
+            )
+            baselines = torch.mean(baselines, dim=0)
+
+            log_pi = log_pi.contiguous().view(
+                self.M, -1, log_pi.shape[-1]
+            )
+            log_pi = torch.mean(log_pi, dim=0)
+
+            # calculate reward
+            predicted = torch.max(log_probas, 1)[1]
+            R = (predicted.detach() == y).float()
+            R = R.unsqueeze(1).repeat(1, self.num_glimpses)
+
+            # compute losses for differentiable modules
+            loss_action = F.nll_loss(log_probas, y)
+            loss_baseline = F.mse_loss(baselines, R)
+
+            # compute reinforce loss
+            adjusted_reward = R - baselines.detach()
+            loss_reinforce = torch.mean(-log_pi*adjusted_reward)
+
+            # sum up into a hybrid loss
+            loss = loss_action + loss_baseline + loss_reinforce
+
+            # compute accuracy
+            correct = (predicted == y).float()
+            acc = 100 * (correct.sum() / len(y))
+
+            # store
+            losses.update(loss.data[0], x.size()[0])
+            accs.update(acc.data[0], x.size()[0])
+
+            # log to tensorboard
+            if self.use_tensorboard:
+                iteration = epoch*len(self.valid_loader) + i
+                log_value('valid_loss', losses.avg, iteration)
+                log_value('valid_acc', accs.avg, iteration)
+
+        return losses.avg, accs.avg
+
+    def save_checkpoint(self, state, is_best):
+        """
+        Save a copy of the model so that it can be loaded at a future
+        date. This function is used when the model is being evaluated
+        on the test data.
+        If this model has reached the best validation accuracy thus
+        far, a seperate file with the suffix `best` is created.
+        """
+        # print("[*] Saving model to {}".format(self.ckpt_dir))
+
+        filename = self.model_name + '_ckpt.pth.tar'
+        ckpt_path = os.path.join(self.ckpt_dir, filename)
+        torch.save(state, ckpt_path)
+
+        if is_best:
+            filename = self.model_name + '_model_best.pth.tar'
+            shutil.copyfile(
+                ckpt_path, os.path.join(self.ckpt_dir, filename)
+            )
+
+    def load_checkpoint(self, best=False):
+        """
+        Load the best copy of a model. This is useful for 2 cases:
+        - Resuming training with the most recent model checkpoint.
+        - Loading the best validation model to evaluate on the test data.
+        Params
+        ------
+        - best: if set to True, loads the best model. Use this if you want
+          to evaluate your model on the test data. Else, set to False in
+          which case the most recent version of the checkpoint is used.
+        """
+        print("[*] Loading model from {}".format(self.ckpt_dir))
+
+        filename = self.model_name + '_ckpt.pth.tar'
+        if best:
+            filename = self.model_name + '_model_best.pth.tar'
+        ckpt_path = os.path.join(self.ckpt_dir, filename)
+        ckpt = torch.load(ckpt_path)
+
+        # load variables from checkpoint
+        self.start_epoch = ckpt['epoch']
+        self.best_valid_acc = ckpt['best_valid_acc']
+        self.lr = ckpt['lr']
+        self.model.load_state_dict(ckpt['state_dict'])
+
+        if best:
+            print(
+                "[*] Loaded {} checkpoint @ epoch {} "
+                "with best valid acc of {:.3f}".format(
+                    filename, ckpt['epoch']+1, ckpt['best_valid_acc'])
+            )
+        else:
+            print(
+                "[*] Loaded {} checkpoint @ epoch {}".format(
+                    filename, ckpt['epoch']+1)
+            )
