@@ -160,7 +160,10 @@ class Hyperband(object):
                 ]
 
         best = np.argmax([b[1] for b in best_configs])
-        results[best_configs[best][0].__str__()] = best_configs[best][1]
+        best_model = best_configs[best]
+        results["val_loss"] = best_model[1]
+        results["params"] = best_model[0].new_params
+        results["str"] = best_model[0].__str__()
         return results
 
     def get_random_config(self):
@@ -172,6 +175,7 @@ class Hyperband(object):
         self.all_batchnorm = False
         self.all_drop = False
 
+        new_params = {}
         layers = []
         used_acts = []
         all_act = False
@@ -195,6 +199,7 @@ class Hyperband(object):
                             self.net_params, '{}_act'.format(layer_num)
                         )
                         hyperp = sample_from(space)
+                        new_params["act"] = hyperp
                         new_act = str2act(hyperp)
                         used_acts.append(new_act.__str__())
                         layers.append(new_act)
@@ -205,6 +210,7 @@ class Hyperband(object):
                             self.net_params, '{}_drop'.format(layer_num)
                         )
                         hyperp = sample_from(space)
+                        new_params["drop"] = hyperp
                         layers.append(nn.Dropout(p=hyperp))
                     else:
                         pass
@@ -215,6 +221,7 @@ class Hyperband(object):
                             self.net_params, '{}_act'.format(layer_num)
                         )
                         hyperp = sample_from(space)
+                        new_params["act"] = hyperp
                         new_act = str2act(hyperp)
                         used_acts.append(new_act.__str__())
                         layers.append(new_act)
@@ -226,6 +233,7 @@ class Hyperband(object):
                             self.net_params, '{}_drop'.format(layer_num)
                         )
                         hyperp = sample_from(space)
+                        new_params["drop"] = hyperp
                         layers.append(nn.Dropout(p=hyperp))
                     else:
                         pass
@@ -235,6 +243,7 @@ class Hyperband(object):
                             self.net_params, '{}_act'.format(layer_num)
                         )
                         hyperp = sample_from(space)
+                        new_params["act"] = hyperp
                         new_act = str2act(hyperp)
                         used_acts.append(new_act.__str__())
                         layers[i] = new_act
@@ -243,6 +252,7 @@ class Hyperband(object):
                             self.net_params, '{}_drop'.format(layer_num)
                         )
                         hyperp = sample_from(space)
+                        new_params["drop"] = hyperp
                         layers.append(nn.Dropout(p=hyperp))
                         layers.append(self.model[i])
                     else:
@@ -275,6 +285,7 @@ class Hyperband(object):
             old_act = used_acts[0]
             space = self.net_params['all_act'][1][1]
             hyperp = sample_from(space)
+            new_params["all_act"] = hyperp
             new_act = str2act(hyperp)
             used_acts.append(new_act.__str__())
             for i, l in enumerate(layers):
@@ -282,6 +293,7 @@ class Hyperband(object):
                     layers[i] = new_act
         if all_batchnorm:
             self.all_batchnorm = True
+            new_params["all_batch"] = True
             target_acts = used_acts if not all_act else used_acts[1:]
             for i, l in enumerate(layers):
                 if l.__str__() in target_acts:
@@ -297,6 +309,7 @@ class Hyperband(object):
             layers.insert(-1, bn)
         if all_drop:
             self.all_drop = True
+            new_params["all_drop"] = True
             target_acts = used_acts if not all_act else used_acts[1:]
             space = self.net_params['all_dropout'][1][1]
             hyperp = sample_from(space)
@@ -311,6 +324,7 @@ class Hyperband(object):
                 self.all_batchnorm + self.all_drop
             )
             hyperp = sample_from(v)
+            new_params["{}_hidden_size".format(layer_num)] = hyperp
             sizes[layer_num] = hyperp
 
         for layer, size in sizes.items():
@@ -326,6 +340,7 @@ class Hyperband(object):
 
         mutated = nn.Sequential(*layers)
         mutated.ckpt_name = str(uuid.uuid4().hex)
+        mutated.new_params = new_params
         return mutated
 
     def _check_bn_drop(self, model):
@@ -372,6 +387,7 @@ class Hyperband(object):
                 reg_layers.append((layer_num, hyperp, l2_reg))
             else:
                 pass
+        model.new_params["reg_layers"] = reg_layers
         return reg_layers
 
     def _get_reg_loss(self, model, reg_layers):
@@ -410,6 +426,8 @@ class Hyperband(object):
             opt = SGD
         elif name == "adam":
             opt = Adam
+        model.new_params["optim"] = name
+        model.new_params["lr"] = lr
         optim = opt(model.parameters(), lr=lr)
         return optim
 

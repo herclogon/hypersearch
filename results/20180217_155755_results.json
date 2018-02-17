@@ -1,0 +1,33 @@
+{
+    "params": {
+        "3_hidden_size": 885,
+        "6_hidden_size": 490,
+        "all_batch": true,
+        "lr": 0.007450354827804282,
+        "optim": "sgd",
+        "reg_layers": [
+            [
+                0,
+                6.8240600303015646e-06,
+                true
+            ],
+            [
+                3,
+                4.601952370076479e-06,
+                true
+            ],
+            [
+                6,
+                4.092462121699329e-06,
+                true
+            ],
+            [
+                9,
+                4.980121455570941e-06,
+                true
+            ]
+        ]
+    },
+    "str": "Sequential(\n  (0): Linear(in_features=784, out_features=512)\n  (1): ReLU()\n  (2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)\n  (3): Linear(in_features=512, out_features=885)\n  (4): ReLU()\n  (5): BatchNorm2d(885, eps=1e-05, momentum=0.1, affine=True)\n  (6): Linear(in_features=885, out_features=490)\n  (7): ReLU()\n  (8): BatchNorm2d(490, eps=1e-05, momentum=0.1, affine=True)\n  (9): Linear(in_features=490, out_features=10)\n  (10): BatchNorm2d(10, eps=1e-05, momentum=0.1, affine=True)\n  (11): LogSoftmax()\n)",
+    "val_loss": 1.9702026641468207
+}
