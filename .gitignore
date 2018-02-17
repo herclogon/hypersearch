@@ -2,6 +2,7 @@
 .DS_Store
 /data/
 /ckpt/
+shit.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

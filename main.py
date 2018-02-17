@@ -36,7 +36,7 @@ def main(args):
     hyperband = Hyperband(args, model, params)
 
     # tune
-    hyperband.tune()
+    results = hyperband.tune()
 
 
 if __name__ == '__main__':

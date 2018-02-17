@@ -155,6 +155,8 @@ class Hyperband(object):
             if s == self.s_max:
                 self.results[T] = val_losses[0]
 
+        return self.results
+
     def get_random_config(self):
         """
         Build a mutated version of the user's model that
