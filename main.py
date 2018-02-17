@@ -1,8 +1,8 @@
 import config
 
-from utils import prepare_dirs
 from hyperband import Hyperband
 from model import get_base_model
+from utils import prepare_dirs, save_results
 
 
 def main(args):
@@ -37,6 +37,9 @@ def main(args):
 
     # tune
     results = hyperband.tune()
+
+    # dump results
+    save_results(results)
 
 
 if __name__ == '__main__':

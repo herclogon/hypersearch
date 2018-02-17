@@ -16,7 +16,7 @@
 - [x] train loop
 - [x] < 1 epoch support
 - [x] filter out early stopping configs
-- [ ] visualization + logging support
+- [x] logging support
 - [ ] multi-gpu support
 
 ## Supported Hyperparameters

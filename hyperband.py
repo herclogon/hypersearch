@@ -1,5 +1,4 @@
 import os
-import time
 import uuid
 import numpy as np
 
@@ -112,7 +111,8 @@ class Hyperband(object):
         Tune the hyperparameters of the pytorch model
         using Hyperband.
         """
-        self.results = {}
+        best_configs = []
+        results = {}
 
         # finite horizon outerloop
         for s in reversed(range(self.s_max + 1)):
@@ -133,7 +133,7 @@ class Hyperband(object):
                 r_i = int(r * self.eta ** (i))
 
                 tqdm.write(
-                    "[*] running {} configs for {} iters each...".format(n_i, r_i)
+                    "[*] running {} configs for {} iters each".format(n_i, r_i)
                 )
 
                 # run each of the n_i configs for r_i iterations
@@ -144,18 +144,24 @@ class Hyperband(object):
                         val_losses.append(val_loss)
                         pbar.update(1)
 
+                if i == s:
+                    sorted_idx = np.argsort(val_losses)
+                    T = T[sorted_idx[0]]
+                    l = val_losses[sorted_idx[0]]
+                    best_configs.append([T, l])
+
                 # remove early stopped configs and keep the best n_i / eta
                 T = [
-                    T[k] for k in np.argsort(val_losses) if val_losses[k] != 999999
+                    T[k] for k in np.argsort(val_losses)
+                    if val_losses[k] != 999999
                 ]
                 T = [
                     T[k] for k in np.argsort(val_losses)[0:int(n_i / self.eta)]
                 ]
 
-            if s == self.s_max:
-                self.results[T] = val_losses[0]
-
-        return self.results
+        best = np.argmax([b[1] for b in best_configs])
+        results[best_configs[best][0].__str__()] = best_configs[best][1]
+        return results
 
     def get_random_config(self):
         """

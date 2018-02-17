@@ -1,10 +1,19 @@
 import os
 import time
+import json
 import numpy as np
 
 import torch.nn as nn
 
 from numpy.random import uniform, normal, randint, choice
+
+
+def save_results(r):
+    date = time.strftime("%Y%m%d_%H%M%S")
+    filename = date + '_results.json'
+    param_path = os.path.join('./results/', filename)
+    with open(param_path, 'w') as fp:
+        json.dump(r, fp, indent=4, sort_keys=True)
 
 
 def find_key(params, partial_key):
