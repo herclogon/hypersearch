@@ -1,4 +1,4 @@
-[WIP]
+## HyperBand
 
 - [x] v1 support: fc networks
 - [ ] v2 support: conv networks
@@ -37,7 +37,7 @@
 - [ ] Change Layer Params
     - [x] change fc output size
     - [ ] change conv params
-- [ ] Optimization
+- [x] Optimization
     - [x] batch size
     - [x] learning rate
     - [x] optimizer (adam, sgd)
