@@ -3,7 +3,7 @@
 This is a PyTorch implementation of [Hyperband: A Novel Bandit-Based Approach to Hyperparameter Optimization](https://arxiv.org/abs/1603.06560) by Lisha Li, Kevin Jamieson, Giulia DeSalvo, Afshin Rostamizadeh and Ameet Talwalkar.
 
 <p align="center">
- <img src="./assets/res1.pdf" alt="Drawing", width=50%>
+ <img src="./assets/res.png" alt="Drawing", width=50%>
 </p>
 
 HyperBand is a hyperparameter optimization algorithm that exploits the iterative nature of SGD and the embarassing parallelism of random search. Unlike Bayesian optimization methods which focus on optimizing hyperparameter *configuration* selection, HyperBand poses the problem as a hyperparameter *evaluation* problem, adaptively allocating more resources to promising configurations while quickly eliminating poor ones. This allows it to evaluate orders of magnitude more hyperparameter configurations.
