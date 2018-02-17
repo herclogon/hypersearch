@@ -129,8 +129,8 @@ class Hyperband(object):
             T = [self.get_random_config() for i in range(n)]
 
             for i in range(s + 1):
-                n_i = n * self.eta ** (-i)
-                r_i = r * self.eta ** (i)
+                n_i = int(n * self.eta ** (-i))
+                r_i = int(r * self.eta ** (i))
 
                 tqdm.write(
                     "[*] running {} configs for {} iters each...".format(n_i, r_i)
@@ -152,9 +152,8 @@ class Hyperband(object):
                     T[k] for k in np.argsort(val_losses)[0:int(n_i / self.eta)]
                 ]
 
-            print(T)
-            print(val_losses)
-            # self.results[T]
+            if s == self.s_max:
+                self.results[T] = val_losses[0]
 
     def get_random_config(self):
         """
