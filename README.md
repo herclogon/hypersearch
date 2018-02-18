@@ -33,7 +33,7 @@ Sequential(
   (3): ReLU()
   (4): Linear(in_features=256, out_features=128)
   (5): ReLU()
-  (6): Linear(in_features=256, out_features=10)
+  (6): Linear(in_features=128, out_features=10)
   (7): LogSoftmax()
 )
 ```
