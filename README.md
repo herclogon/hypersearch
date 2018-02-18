@@ -102,6 +102,7 @@ python main.py
 - [x] < 1 epoch support
 - [x] filter out early stopping configs
 - [x] logging support
+- [ ] max exploration option (`s = s_max`)
 - [ ] input error checking
 - [ ] plotting loss support
 - [ ] arbitrary loss support
