@@ -16,7 +16,7 @@ def add_argument_group(name):
 
 # hyperband params
 hyper_arg = add_argument_group('Hyperband Params')
-hyper_arg.add_argument('--max_iter', type=int, default=81,
+hyper_arg.add_argument('--max_iter', type=int, default=3,
                        help='Maximum # of iters allocated to a given config')
 hyper_arg.add_argument('--eta', type=int, default=3,
                        help='Proportion of configs discarded in each round of SH')

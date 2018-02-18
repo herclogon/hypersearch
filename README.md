@@ -102,6 +102,8 @@ python main.py
 - [x] < 1 epoch support
 - [x] filter out early stopping configs
 - [x] logging support
+- [ ] input error checking
+- [ ] plotting loss support
 - [ ] arbitrary loss support
 - [ ] multi-gpu support
 - [ ] conv nn support

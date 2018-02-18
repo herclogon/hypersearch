@@ -69,6 +69,7 @@ class Hyperband(object):
         if self.num_gpu > 0:
             self.kwargs = {'num_workers': 1, 'pin_memory': True}
         if 'batch_size' not in self.optim_params:
+            self.batch_hyper = False
             self.data_loader = get_train_valid_loader(
                 args.data_dir, args.name, args.batch_size,
                 args.valid_size, args.shuffle, **self.kwargs
@@ -339,9 +340,62 @@ class Hyperband(object):
             layers[next_layer] = nn.Linear(size, out_dim)
 
         mutated = nn.Sequential(*layers)
+        self._init_weights_biases(mutated)
         mutated.ckpt_name = str(uuid.uuid4().hex)
         mutated.new_params = new_params
         return mutated
+
+    def _init_weights_biases(self, model):
+        """
+        If contains mixture of activations, then
+        use glorot/xavier initialization.
+
+        Else, use best-fit activation.
+        """
+        glorot_all = False
+        for key in self.net_params.keys():
+            layer, hp = key.split('_', 1)
+            if layer.isdigit() and hp == "act":
+                glorot_all = True
+            elif key == "all_act":
+                for i, m in enumerate(model):
+                    if not isinstance(m, 
+                        (nn.Linear, nn.BatchNorm2d, nn.Dropout)
+                    ):
+                        if i < len(model) - 1:
+                            act = model[i].__str__()
+                            act = act.lower().split("(")[0]
+                            break
+        if glorot_all:
+            for m in model:
+                if isinstance(m, nn.Linear):
+                    nn.init.xavier_normal(m.weight)
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant(m.weight, 1)
+                    nn.init.constant(m.bias, 0)
+        else:
+            if act == "relu":
+                for m in model:
+                    if isinstance(m, nn.Linear):
+                        nn.init.kaiming_normal(m.weight)
+                    elif isinstance(m, nn.BatchNorm2d):
+                        nn.init.constant(m.weight, 1)
+                        nn.init.constant(m.bias, 0)
+            elif act == "selu":
+                for m in model:
+                    if isinstance(m, nn.Linear):
+                        n = m.out_features
+                        nn.init.normal(m.weight, mean=0, std=np.sqrt(1. / n))
+                    elif isinstance(m, nn.BatchNorm2d):
+                        nn.init.constant(m.weight, 1)
+                        nn.init.constant(m.bias, 0)
+            else:
+                for m in model:
+                    if isinstance(m, nn.Linear):
+                        nn.init.xavier_normal(m.weight)
+                    elif isinstance(m, nn.BatchNorm2d):
+                        nn.init.constant(m.weight, 1)
+                        nn.init.constant(m.bias, 0)
 
     def _check_bn_drop(self, model):
         names = []
