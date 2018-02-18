@@ -348,9 +348,11 @@ class Hyperband(object):
     def _init_weights_biases(self, model):
         """
         If contains mixture of activations, then
-        use glorot/xavier initialization.
+        use glorot/xavier initialization. Else:
 
-        Else, use best-fit activation.
+        - selu: selu init
+        - relu: He et. al init
+        - other: golorot init
         """
         glorot_all = False
         for key in self.net_params.keys():
@@ -385,7 +387,9 @@ class Hyperband(object):
                 for m in model:
                     if isinstance(m, nn.Linear):
                         n = m.out_features
-                        nn.init.normal(m.weight, mean=0, std=np.sqrt(1. / n))
+                        nn.init.normal(m.weight, 
+                            mean=0, std=np.sqrt(1. / n)
+                        )
                     elif isinstance(m, nn.BatchNorm2d):
                         nn.init.constant(m.weight, 1)
                         nn.init.constant(m.bias, 0)
