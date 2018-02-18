@@ -68,7 +68,7 @@ class Hyperband(object):
         self.kwargs = {}
         if self.num_gpu > 0:
             self.kwargs = {'num_workers': 1, 'pin_memory': True}
-        if 'batchsize' not in self.optim_params:
+        if 'batch_size' not in self.optim_params:
             self.data_loader = get_train_valid_loader(
                 args.data_dir, args.name, args.batch_size,
                 args.valid_size, args.shuffle, **self.kwargs
@@ -463,6 +463,18 @@ class Hyperband(object):
         # parse reg params
         reg_layers = self._add_reg(model)
 
+        # setup train loader
+        if self.data_loader is None:
+            self.batch_hyper = True
+            space = self.optim_params['batch_size']
+            batch_size = sample_from(space)
+            tqdm.write("batch size: {}".format(batch_size))
+            self.data_loader = get_train_valid_loader(
+                self.data_dir, self.args.name,
+                batch_size, self.args.valid_size,
+                self.args.shuffle, **self.kwargs
+            )
+
         # training logic
         min_val_loss = 999999
         counter = 0
@@ -478,6 +490,8 @@ class Hyperband(object):
                 counter += 1
             if counter > self.patience:
                 return 999999
+        if self.batch_hyper:
+            self.data_loader = None
         state = {
             'state_dict': model.state_dict(),
             'min_val_loss': min_val_loss,
@@ -500,18 +514,8 @@ class Hyperband(object):
         # setup optimizer
         optim = self._get_optimizer(model)
 
-        # setup train loader
-        if self.data_loader is None:
-            space = self.optim_params['batch_size']
-            batch_size = sample_from(space)
-            self.data_loader = get_train_valid_loader(
-                self.data_dir, self.args.name,
-                batch_size, self.args.valid_size,
-                self.args.shuffle, **self.kwargs
-            )
         train_loader = self.data_loader[0]
         num_train = len(train_loader.sampler.indices)
-
         for i, (x, y) in enumerate(train_loader):
             if num_passes is not None:
                 if i > num_passes:
@@ -535,18 +539,8 @@ class Hyperband(object):
         """
         model.eval()
 
-        # setup valid loader
-        if self.data_loader is None:
-            space = self.optim_params['batch_size']
-            batch_size = sample_from(space)
-            self.data_loader = get_train_valid_loader(
-                self.data_dir, self.args.name,
-                batch_size, self.args.valid_size,
-                self.args.shuffle, **self.kwargs
-            )
         val_loader = self.data_loader[1]
         num_valid = len(val_loader.sampler.indices)
-
         val_loss = 0.
         for i, (x, y) in enumerate(val_loader):
             if self.num_gpu > 0:
