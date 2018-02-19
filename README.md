@@ -22,9 +22,8 @@ HyperBand is a hyperparameter optimization algorithm that exploits the iterative
 
 ```
 pip install -r requirements.txt
-``` 
+```
 * Define your model in `model.py`. This should return a `nn.Sequential` object. Take note of the last layer, i.e. using `nn.LogSoftmax()` vs. `nn.Softmax()` will require possible changes in the training method. For example, let's define a 4 layer FC network as follows:
-
 ```
 Sequential(
   (0): Linear(in_features=784, out_features=512)
@@ -97,18 +96,13 @@ python main.py
 
 ## Todo
 
-- [x] setup checkpointing
-- [x] train loop
-- [x] < 1 epoch support
-- [x] filter out early stopping configs
-- [x] logging support
+- [ ] **conv nn support**
 - [ ] max exploration option (`s = s_max`)
 - [ ] input error checking
-- [ ] plotting loss support
-- [ ] arbitrary loss support
-- [ ] multi-gpu support
-- [ ] conv nn support
+- [ ] improve plotting and logging
+- [ ] multi-gpu and multi-cpu support
 
 ## References
 
 - [zygmuntz's hyperband](https://github.com/zygmuntz/hyperband)
+- [Demo by kgjamieson](https://people.eecs.berkeley.edu/~kjamieson/hyperband.html)

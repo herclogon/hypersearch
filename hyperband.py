@@ -453,10 +453,11 @@ class Hyperband(object):
         Compute the regularization loss of the model layers
         as defined by reg_layers.
         """
-        reg_loss = Variable(torch.FloatTensor(1), requires_grad=True)
+        dtype = torch.FloatTensor if self.num_gpu == 0 else torch.cuda.FloatTensor
+        reg_loss = Variable(torch.zeros(1), requires_grad=True).type(dtype)
         for layer_num, scale, l2 in reg_layers:
-            l1_loss = Variable(torch.FloatTensor(1), requires_grad=True)
-            l2_loss = Variable(torch.FloatTensor(1), requires_grad=True)
+            l1_loss = Variable(torch.zeros(1), requires_grad=True).type(dtype)
+            l2_loss = Variable(torch.zeros(1), requires_grad=True).type(dtype)
             if l2:
                 for W in model[layer_num].parameters():
                     l2_loss = l2_loss + (W.norm(2) ** 2)
