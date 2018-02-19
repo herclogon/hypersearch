@@ -16,7 +16,7 @@ def add_argument_group(name):
 
 # hyperband params
 hyper_arg = add_argument_group('Hyperband Params')
-hyper_arg.add_argument('--max_iter', type=int, default=3,
+hyper_arg.add_argument('--max_iter', type=int, default=81,
                        help='Maximum # of iters allocated to a given config')
 hyper_arg.add_argument('--eta', type=int, default=3,
                        help='Proportion of configs discarded in each round of SH')
@@ -47,7 +47,7 @@ train_arg.add_argument('--patience', type=int, default=5,
 
 # misc params
 misc_arg = add_argument_group('Misc.')
-misc_arg.add_argument('--num_gpu', type=int, default=0,
+misc_arg.add_argument('--num_gpu', type=int, default=1,
                       help='0 for cpu, greater for gpu')
 misc_arg.add_argument('--data_dir', type=str, default='./data/',
                       help='Directory in which data is stored')
