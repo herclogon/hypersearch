@@ -120,7 +120,7 @@ class Hyperband(object):
             # initial number of configs
             n = int(
                 np.ceil(
-                    self.B / self.max_iter / (s+1) * self.eta ** s
+                    int(self.B / self.max_iter / (s+1)) * self.eta ** s
                 )
             )
             # initial number of iterations to run the n configs for
