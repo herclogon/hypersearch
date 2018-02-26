@@ -1,7 +1,5 @@
 import torch.nn as nn
 
-from utils import Reshape
-
 
 def get_base_model():
 

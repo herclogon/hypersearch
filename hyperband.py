@@ -2,9 +2,9 @@ import os
 import uuid
 import numpy as np
 
-from utils import *
 from tqdm import tqdm
 from data_loader import get_train_valid_loader
+from utils import find_key, sample_from, str2act
 
 import torch
 import torch.nn as nn
@@ -49,7 +49,7 @@ class Hyperband(object):
         self.max_iter = args.max_iter
         self.eta = args.eta
         self.s_max = int(np.log(self.max_iter) / np.log(self.eta))
-        self.B = (self.s_max+1) * self.max_iter
+        self.B = (self.s_max + 1) * self.max_iter
 
         print(
             "[*] max_iter: {}, eta: {}, B: {}".format(
@@ -120,7 +120,7 @@ class Hyperband(object):
             # initial number of configs
             n = int(
                 np.ceil(
-                    int(self.B / self.max_iter / (s+1)) * self.eta ** s
+                    int(self.B / self.max_iter / (s + 1)) * self.eta ** s
                 )
             )
             # initial number of iterations to run the n configs for
@@ -129,12 +129,15 @@ class Hyperband(object):
             # finite horizon SH with (n, r)
             T = [self.get_random_config() for i in range(n)]
 
+            tqdm.write("s: {}".format(s))
+
             for i in range(s + 1):
                 n_i = int(n * self.eta ** (-i))
                 r_i = int(r * self.eta ** (i))
 
                 tqdm.write(
-                    "[*] running {} configs for {} iters each".format(n_i, r_i)
+                    "[*] {}/{} - running {} configs for {} iters each".format(
+                        i+1, s+1, len(T), r_i)
                 )
 
                 # run each of the n_i configs for r_i iterations
@@ -145,23 +148,19 @@ class Hyperband(object):
                         val_losses.append(val_loss)
                         pbar.update(1)
 
-                if i == s:
-                    sorted_idx = np.argsort(val_losses)
-                    T = T[sorted_idx[0]]
-                    l = val_losses[sorted_idx[0]]
-                    best_configs.append([T, l])
-
                 # remove early stopped configs and keep the best n_i / eta
-                T = [
-                    T[k] for k in np.argsort(val_losses)
-                    if val_losses[k] != 999999
-                ]
-                T = [
-                    T[k] for k in np.argsort(val_losses)[0:int(n_i / self.eta)]
-                ]
+                if i < s - 1:
+                    sort_loss_idx = np.argsort(
+                        val_losses
+                    )[0:int(n_i / self.eta)]
+                    T = [T[k] for k in sort_loss_idx if not T[k].early_stopped]
+                    tqdm.write("Left with: {}".format(len(T)))
 
-        best = np.argmax([b[1] for b in best_configs])
-        best_model = best_configs[best]
+            best_idx = np.argmin(val_losses)
+            best_configs.append([T[best_idx], val_losses[best_idx]])
+
+        best_idx = np.argmax([b[1] for b in best_configs])
+        best_model = best_configs[best_idx]
         results["val_loss"] = best_model[1]
         results["params"] = best_model[0].new_params
         results["str"] = best_model[0].__str__()
@@ -343,6 +342,7 @@ class Hyperband(object):
         self._init_weights_biases(mutated)
         mutated.ckpt_name = str(uuid.uuid4().hex)
         mutated.new_params = new_params
+        mutated.early_stopped = False
         return mutated
 
     def _init_weights_biases(self, model):
@@ -361,8 +361,8 @@ class Hyperband(object):
                 glorot_all = True
             elif key == "all_act":
                 for i, m in enumerate(model):
-                    if not isinstance(m, 
-                        (nn.Linear, nn.BatchNorm2d, nn.Dropout)
+                    if not isinstance(
+                        m, (nn.Linear, nn.BatchNorm2d, nn.Dropout)
                     ):
                         if i < len(model) - 1:
                             act = model[i].__str__()
@@ -387,8 +387,8 @@ class Hyperband(object):
                 for m in model:
                     if isinstance(m, nn.Linear):
                         n = m.out_features
-                        nn.init.normal(m.weight, 
-                            mean=0, std=np.sqrt(1. / n)
+                        nn.init.normal(
+                            m.weight, mean=0, std=np.sqrt(1./n)
                         )
                     elif isinstance(m, nn.BatchNorm2d):
                         nn.init.constant(m.weight, 1)
@@ -548,7 +548,9 @@ class Hyperband(object):
             else:
                 counter += 1
             if counter > self.patience:
-                return 999999
+                tqdm.write("[!] early stopped!!")
+                model.early_stopped = True
+                return min_val_loss
         if self.batch_hyper:
             self.data_loader = None
         state = {
@@ -574,7 +576,6 @@ class Hyperband(object):
         optim = self._get_optimizer(model)
 
         train_loader = self.data_loader[0]
-        num_train = len(train_loader.sampler.indices)
         for i, (x, y) in enumerate(train_loader):
             if num_passes is not None:
                 if i > num_passes:
