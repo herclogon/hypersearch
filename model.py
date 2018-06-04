@@ -2,7 +2,6 @@ import torch.nn as nn
 
 
 def get_base_model():
-
     layers = []
     layers.append(nn.Linear(784, 512))
     layers.append(nn.ReLU())

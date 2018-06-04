@@ -63,6 +63,9 @@ class Hyperband(object):
         self.num_gpu = args.num_gpu
         self.print_freq = args.print_freq
 
+        # device
+        self.device = torch.device("cuda" if self.num_gpu > 0 else "cpu")
+
         # data params
         self.data_loader = None
         self.kwargs = {}
@@ -174,171 +177,175 @@ class Hyperband(object):
         """
         self.all_batchnorm = False
         self.all_drop = False
-
         new_params = {}
-        layers = []
-        used_acts = []
-        all_act = False
-        all_drop = False
-        all_batchnorm = False
-        num_layers = len(self.model)
 
-        i = 0
-        used_acts.append(self.model[1].__str__())
-        for layer_hp in self.net_params.keys():
-            layer, hp = layer_hp.split('_', 1)
-            if layer.isdigit():
-                layer_num = int(layer)
-                diff = layer_num - i
-                if diff > 0:
-                    for j in range(diff + 1):
-                        layers.append(self.model[i+j])
-                    i += diff
-                    if hp == 'act':
-                        space = find_key(
-                            self.net_params, '{}_act'.format(layer_num)
-                        )
-                        hyperp = sample_from(space)
-                        new_params["act"] = hyperp
-                        new_act = str2act(hyperp)
-                        used_acts.append(new_act.__str__())
-                        layers.append(new_act)
-                        i += 1
-                    elif hp == 'dropout':
+        if not self.net_params:
+            mutated = self.model
+        else:
+            layers = []
+            used_acts = []
+            all_act = False
+            all_drop = False
+            all_batchnorm = False
+            num_layers = len(self.model)
+
+            i = 0
+            used_acts.append(self.model[1].__str__())
+            for layer_hp in self.net_params.keys():
+                layer, hp = layer_hp.split('_', 1)
+                if layer.isdigit():
+                    layer_num = int(layer)
+                    diff = layer_num - i
+                    if diff > 0:
+                        for j in range(diff + 1):
+                            layers.append(self.model[i+j])
+                        i += diff
+                        if hp == 'act':
+                            space = find_key(
+                                self.net_params, '{}_act'.format(layer_num)
+                            )
+                            hyperp = sample_from(space)
+                            new_params["act"] = hyperp
+                            new_act = str2act(hyperp)
+                            used_acts.append(new_act.__str__())
+                            layers.append(new_act)
+                            i += 1
+                        elif hp == 'dropout':
+                            layers.append(self.model[i])
+                            space = find_key(
+                                self.net_params, '{}_drop'.format(layer_num)
+                            )
+                            hyperp = sample_from(space)
+                            new_params["drop"] = hyperp
+                            layers.append(nn.Dropout(p=hyperp))
+                        else:
+                            pass
+                    elif diff == 0:
                         layers.append(self.model[i])
-                        space = find_key(
-                            self.net_params, '{}_drop'.format(layer_num)
-                        )
-                        hyperp = sample_from(space)
-                        new_params["drop"] = hyperp
-                        layers.append(nn.Dropout(p=hyperp))
+                        if hp == 'act':
+                            space = find_key(
+                                self.net_params, '{}_act'.format(layer_num)
+                            )
+                            hyperp = sample_from(space)
+                            new_params["act"] = hyperp
+                            new_act = str2act(hyperp)
+                            used_acts.append(new_act.__str__())
+                            layers.append(new_act)
+                            i += 1
+                        elif hp == 'dropout':
+                            i += 1
+                            layers.append(self.model[i])
+                            space = find_key(
+                                self.net_params, '{}_drop'.format(layer_num)
+                            )
+                            hyperp = sample_from(space)
+                            new_params["drop"] = hyperp
+                            layers.append(nn.Dropout(p=hyperp))
+                        else:
+                            pass
                     else:
-                        pass
-                elif diff == 0:
-                    layers.append(self.model[i])
-                    if hp == 'act':
-                        space = find_key(
-                            self.net_params, '{}_act'.format(layer_num)
-                        )
-                        hyperp = sample_from(space)
-                        new_params["act"] = hyperp
-                        new_act = str2act(hyperp)
-                        used_acts.append(new_act.__str__())
-                        layers.append(new_act)
-                        i += 1
-                    elif hp == 'dropout':
-                        i += 1
-                        layers.append(self.model[i])
-                        space = find_key(
-                            self.net_params, '{}_drop'.format(layer_num)
-                        )
-                        hyperp = sample_from(space)
-                        new_params["drop"] = hyperp
-                        layers.append(nn.Dropout(p=hyperp))
-                    else:
-                        pass
-                else:
-                    if hp == 'act':
-                        space = find_key(
-                            self.net_params, '{}_act'.format(layer_num)
-                        )
-                        hyperp = sample_from(space)
-                        new_params["act"] = hyperp
-                        new_act = str2act(hyperp)
-                        used_acts.append(new_act.__str__())
-                        layers[i] = new_act
-                    elif hp == 'dropout':
-                        space = find_key(
-                            self.net_params, '{}_drop'.format(layer_num)
-                        )
-                        hyperp = sample_from(space)
-                        new_params["drop"] = hyperp
-                        layers.append(nn.Dropout(p=hyperp))
-                        layers.append(self.model[i])
-                    else:
-                        pass
-                i += 1
-            else:
-                if (i < num_layers) and (len(layers) < num_layers):
-                    for j in range(num_layers-i):
-                        layers.append(self.model[i+j])
+                        if hp == 'act':
+                            space = find_key(
+                                self.net_params, '{}_act'.format(layer_num)
+                            )
+                            hyperp = sample_from(space)
+                            new_params["act"] = hyperp
+                            new_act = str2act(hyperp)
+                            used_acts.append(new_act.__str__())
+                            layers[i] = new_act
+                        elif hp == 'dropout':
+                            space = find_key(
+                                self.net_params, '{}_drop'.format(layer_num)
+                            )
+                            hyperp = sample_from(space)
+                            new_params["drop"] = hyperp
+                            layers.append(nn.Dropout(p=hyperp))
+                            layers.append(self.model[i])
+                        else:
+                            pass
                     i += 1
-                if layer == "all":
-                    if hp == "act":
-                        space = self.net_params['all_act']
-                        hyperp = sample_from(space)
-                        all_act = False if hyperp == [0] else True
-                    elif hp == "dropout":
-                        space = self.net_params['all_dropout']
-                        hyperp = sample_from(space)
-                        all_drop = False if hyperp == [0] else True
-                    elif hp == "batchnorm":
-                        space = self.net_params['all_batchnorm']
-                        hyperp = sample_from(space)
-                        all_batchnorm = True if hyperp == 1 else False
-                    else:
-                        pass
+                else:
+                    if (i < num_layers) and (len(layers) < num_layers):
+                        for j in range(num_layers-i):
+                            layers.append(self.model[i+j])
+                        i += 1
+                    if layer == "all":
+                        if hp == "act":
+                            space = self.net_params['all_act']
+                            hyperp = sample_from(space)
+                            all_act = False if hyperp == [0] else True
+                        elif hp == "dropout":
+                            space = self.net_params['all_dropout']
+                            hyperp = sample_from(space)
+                            all_drop = False if hyperp == [0] else True
+                        elif hp == "batchnorm":
+                            space = self.net_params['all_batchnorm']
+                            hyperp = sample_from(space)
+                            all_batchnorm = True if hyperp == 1 else False
+                        else:
+                            pass
 
-        used_acts = sorted(set(used_acts), key=used_acts.index)
+            used_acts = sorted(set(used_acts), key=used_acts.index)
 
-        if all_act:
-            old_act = used_acts[0]
-            space = self.net_params['all_act'][1][1]
-            hyperp = sample_from(space)
-            new_params["all_act"] = hyperp
-            new_act = str2act(hyperp)
-            used_acts.append(new_act.__str__())
-            for i, l in enumerate(layers):
-                if l.__str__() == old_act:
-                    layers[i] = new_act
-        if all_batchnorm:
-            self.all_batchnorm = True
-            new_params["all_batch"] = True
-            target_acts = used_acts if not all_act else used_acts[1:]
-            for i, l in enumerate(layers):
-                if l.__str__() in target_acts:
-                    if 'Linear' in layers[i-1].__str__():
-                        bn = nn.BatchNorm2d(layers[i-1].out_features)
-                    else:
-                        bn = nn.BatchNorm2d(layers[i-1].out_channels)
-                    layers.insert(i+1, bn)
-            if 'Linear' in layers[-2].__str__():
-                bn = nn.BatchNorm2d(layers[i-1].out_features)
-            else:
-                bn = nn.BatchNorm2d(layers[i-1].out_channels)
-            layers.insert(-1, bn)
-        if all_drop:
-            self.all_drop = True
-            new_params["all_drop"] = True
-            target_acts = used_acts if not all_act else used_acts[1:]
-            space = self.net_params['all_dropout'][1][1]
-            hyperp = sample_from(space)
-            for i, l in enumerate(layers):
-                if l.__str__() in target_acts:
-                    layers.insert(i + 1 + all_batchnorm, nn.Dropout(p=hyperp))
+            if all_act:
+                old_act = used_acts[0]
+                space = self.net_params['all_act'][1][1]
+                hyperp = sample_from(space)
+                new_params["all_act"] = hyperp
+                new_act = str2act(hyperp)
+                used_acts.append(new_act.__str__())
+                for i, l in enumerate(layers):
+                    if l.__str__() == old_act:
+                        layers[i] = new_act
+            if all_batchnorm:
+                self.all_batchnorm = True
+                new_params["all_batch"] = True
+                target_acts = used_acts if not all_act else used_acts[1:]
+                for i, l in enumerate(layers):
+                    if l.__str__() in target_acts:
+                        if 'Linear' in layers[i-1].__str__():
+                            bn = nn.BatchNorm2d(layers[i-1].out_features)
+                        else:
+                            bn = nn.BatchNorm2d(layers[i-1].out_channels)
+                        layers.insert(i+1, bn)
+                if 'Linear' in layers[-2].__str__():
+                    bn = nn.BatchNorm2d(layers[i-1].out_features)
+                else:
+                    bn = nn.BatchNorm2d(layers[i-1].out_channels)
+                layers.insert(-1, bn)
+            if all_drop:
+                self.all_drop = True
+                new_params["all_drop"] = True
+                target_acts = used_acts if not all_act else used_acts[1:]
+                space = self.net_params['all_dropout'][1][1]
+                hyperp = sample_from(space)
+                for i, l in enumerate(layers):
+                    if l.__str__() in target_acts:
+                        layers.insert(i + 1 + all_batchnorm, nn.Dropout(p=hyperp))
 
-        sizes = {}
-        for k, v in self.size_params.items():
-            layer_num = int(k.split("_", 1)[0])
-            layer_num += (layer_num // 2) * (
-                self.all_batchnorm + self.all_drop
-            )
-            hyperp = sample_from(v)
-            new_params["{}_hidden_size".format(layer_num)] = hyperp
-            sizes[layer_num] = hyperp
+            sizes = {}
+            for k, v in self.size_params.items():
+                layer_num = int(k.split("_", 1)[0])
+                layer_num += (layer_num // 2) * (
+                    self.all_batchnorm + self.all_drop
+                )
+                hyperp = sample_from(v)
+                new_params["{}_hidden_size".format(layer_num)] = hyperp
+                sizes[layer_num] = hyperp
 
-        for layer, size in sizes.items():
-            in_dim = layers[layer].in_features
-            layers[layer] = nn.Linear(in_dim, size)
-            if self.all_batchnorm:
-                layers[layer + 2] = nn.BatchNorm2d(size)
-            next_layer = layer + (
-                2 + self.all_batchnorm + self.all_drop
-            )
-            out_dim = layers[next_layer].out_features
-            layers[next_layer] = nn.Linear(size, out_dim)
+            for layer, size in sizes.items():
+                in_dim = layers[layer].in_features
+                layers[layer] = nn.Linear(in_dim, size)
+                if self.all_batchnorm:
+                    layers[layer + 2] = nn.BatchNorm2d(size)
+                next_layer = layer + (
+                    2 + self.all_batchnorm + self.all_drop
+                )
+                out_dim = layers[next_layer].out_features
+                layers[next_layer] = nn.Linear(size, out_dim)
 
-        mutated = nn.Sequential(*layers)
+            mutated = nn.Sequential(*layers)
+
         self._init_weights_biases(mutated)
         mutated.ckpt_name = str(uuid.uuid4().hex)
         mutated.new_params = new_params
@@ -346,60 +353,55 @@ class Hyperband(object):
         return mutated
 
     def _init_weights_biases(self, model):
-        """
-        If contains mixture of activations, then
-        use glorot/xavier initialization. Else:
-
-        - selu: selu init
-        - relu: He et. al init
-        - other: golorot init
-        """
+        # figure out if model contains mix of layers => all glorot init)
         glorot_all = False
         for key in self.net_params.keys():
             layer, hp = key.split('_', 1)
             if layer.isdigit() and hp == "act":
                 glorot_all = True
-            elif key == "all_act":
-                for i, m in enumerate(model):
-                    if not isinstance(
-                        m, (nn.Linear, nn.BatchNorm2d, nn.Dropout)
-                    ):
-                        if i < len(model) - 1:
-                            act = model[i].__str__()
-                            act = act.lower().split("(")[0]
-                            break
+
+        # figure out the activation function
+        for i, m in enumerate(model):
+            if not isinstance(
+                m, (nn.Linear, nn.BatchNorm2d, nn.Dropout)
+            ):
+                if i < len(model) - 1:
+                    act = model[i].__str__()
+                    act = act.lower().split("(")[0]
+                    break
+
         if glorot_all:
             for m in model:
                 if isinstance(m, nn.Linear):
-                    nn.init.xavier_normal(m.weight)
+                    nn.init.xavier_normal_(m.weight)
                 elif isinstance(m, nn.BatchNorm2d):
-                    nn.init.constant(m.weight, 1)
-                    nn.init.constant(m.bias, 0)
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
         else:
             if act == "relu":
                 for m in model:
                     if isinstance(m, nn.Linear):
-                        nn.init.kaiming_normal(m.weight)
+                        nn.init.kaiming_normal_(m.weight)
                     elif isinstance(m, nn.BatchNorm2d):
-                        nn.init.constant(m.weight, 1)
-                        nn.init.constant(m.bias, 0)
+                        nn.init.constant_(m.weight, 1)
+                        nn.init.constant_(m.bias, 0)
             elif act == "selu":
                 for m in model:
                     if isinstance(m, nn.Linear):
                         n = m.out_features
-                        nn.init.normal(
+                        nn.init.normal_(
                             m.weight, mean=0, std=np.sqrt(1./n)
                         )
                     elif isinstance(m, nn.BatchNorm2d):
-                        nn.init.constant(m.weight, 1)
-                        nn.init.constant(m.bias, 0)
+                        nn.init.constant_(m.weight, 1)
+                        nn.init.constant_(m.bias, 0)
             else:
                 for m in model:
                     if isinstance(m, nn.Linear):
-                        nn.init.xavier_normal(m.weight)
+                        nn.init.xavier_normal_(m.weight)
                     elif isinstance(m, nn.BatchNorm2d):
-                        nn.init.constant(m.weight, 1)
-                        nn.init.constant(m.bias, 0)
+                        nn.init.constant_(m.weight, 1)
+                        nn.init.constant_(m.bias, 0)
 
     def _check_bn_drop(self, model):
         names = []
@@ -414,10 +416,6 @@ class Hyperband(object):
         return count
 
     def _add_reg(self, model):
-        """
-        Setup regularization on model layers based
-        on parameter dictionary.
-        """
         offset = self._check_bn_drop(model)
         reg_layers = []
         for k in self.reg_params.keys():
@@ -449,10 +447,6 @@ class Hyperband(object):
         return reg_layers
 
     def _get_reg_loss(self, model, reg_layers):
-        """
-        Compute the regularization loss of the model layers
-        as defined by reg_layers.
-        """
         dtype = torch.FloatTensor if self.num_gpu == 0 else torch.cuda.FloatTensor
         reg_loss = Variable(torch.zeros(1), requires_grad=True).type(dtype)
         for layer_num, scale, l2 in reg_layers:
@@ -470,9 +464,6 @@ class Hyperband(object):
         return reg_loss
 
     def _get_optimizer(self, model):
-        """
-        Setup optimizer and learning rate.
-        """
         lr = self.def_lr
         name = self.def_optim
         if "optim" in self.optim_params:
@@ -509,15 +500,13 @@ class Hyperband(object):
         -------
         - val_loss: the lowest validaton loss achieved.
         """
-        # load the most recent checkpoint if it exists
         try:
             ckpt = self._load_checkpoint(model.ckpt_name)
             model.load_state_dict(ckpt['state_dict'])
         except FileNotFoundError:
             pass
 
-        if self.num_gpu > 0:
-            model = model.cuda()
+        model = model.to(self.device)
 
         # parse reg params
         reg_layers = self._add_reg(model)
@@ -561,27 +550,14 @@ class Hyperband(object):
         return min_val_loss
 
     def _train_one_epoch(self, model, num_passes, reg_layers):
-        """
-        Train the model for 1 epoch of the training set.
-
-        An epoch corresponds to one full pass through the entire
-        training set in successive mini-batches.
-
-        If `num_passes` is not None, the model is trained for
-        `num_passes` mini-batch iterations.
-        """
         model.train()
-
-        # setup optimizer
         optim = self._get_optimizer(model)
-
         train_loader = self.data_loader[0]
         for i, (x, y) in enumerate(train_loader):
             if num_passes is not None:
                 if i > num_passes:
                     return
-            if self.num_gpu > 0:
-                x, y = x.cuda(), y.cuda()
+            x, y = x.to(self.device), y.to(self.device)
             batch_size = x.shape[0]
             x = x.view(batch_size, -1)
             x, y = Variable(x), Variable(y)
@@ -594,37 +570,25 @@ class Hyperband(object):
             optim.step()
 
     def _validate_one_epoch(self, model):
-        """
-        Evaluate the model on the validation set.
-        """
         model.eval()
-
         val_loader = self.data_loader[1]
         num_valid = len(val_loader.sampler.indices)
         val_loss = 0.
         for i, (x, y) in enumerate(val_loader):
-            if self.num_gpu > 0:
-                x, y = x.cuda(), y.cuda()
+            x, y = x.to(self.device), y.to(self.device)
             x = x.view(x.size(0), -1)
             x, y = Variable(x), Variable(y)
             output = model(x)
-            val_loss += F.nll_loss(output, y, size_average=False).data[0]
-
+            val_loss += F.nll_loss(output, y, size_average=False).item()
         val_loss /= num_valid
         return val_loss
 
     def _save_checkpoint(self, state, name):
-        """
-        Save a copy of the model.
-        """
         filename = name + '.pth.tar'
         ckpt_path = os.path.join(self.ckpt_dir, filename)
         torch.save(state, ckpt_path)
 
     def _load_checkpoint(self, name):
-        """
-        Load the latest model checkpoint.
-        """
         filename = name + '.pth.tar'
         ckpt_path = os.path.join(self.ckpt_dir, filename)
         ckpt = torch.load(ckpt_path)

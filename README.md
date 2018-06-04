@@ -1,17 +1,13 @@
-# Hyperparameter Optimization for PyTorch
-
-This is a PyTorch implementation of [Hyperband: A Novel Bandit-Based Approach to Hyperparameter Optimization](https://arxiv.org/abs/1603.06560) by Lisha Li, Kevin Jamieson, Giulia DeSalvo, Afshin Rostamizadeh and Ameet Talwalkar.
-
 <p align="center">
- <img src="./assets/res.png" alt="Drawing", width=50%>
+ <img src="./assets/logo.png" alt="Drawing", width=40%>
 </p>
 
-HyperBand is a hyperparameter optimization algorithm that exploits the iterative nature of SGD and the embarassing parallelism of random search. Unlike Bayesian optimization methods which focus on optimizing hyperparameter *configuration* selection, HyperBand poses the problem as a hyperparameter *evaluation* problem, adaptively allocating more resources to promising configurations while quickly eliminating poor ones. This allows it to evaluate orders of magnitude more hyperparameter configurations.
+Tune the hyperparameters of your PyTorch models with **HyperSearch**.
 
 ## Requirements
 
 * Python 3.5+
-* [PyTorch](http://pytorch.org/)
+* [PyTorch](http://pytorch.org/) 0.4+
 * tqdm
 
 ## API
@@ -48,17 +44,17 @@ params = {
     'all_batchnorm': ['choice', [0, 1]],
     'all_l2': ['uniform', 1e-8, 1e-5],
     'optim': ['choice', ["adam", "sgd"]],
-} 
+}
 ```
 Keys are of the form `{layer_num}_{hyperparameter}` where `layer_num` can be a layer from your `nn.Sequential` model or `all` to signify all layers. Values are of the form `[distribution, x]` where `distribution` can be one of `uniform`, `quniform`, `choice`, etc.
 
-For example, `2_hidden: ['quniform', 512, 1000, 1]` means to sample the hidden size of layer 2 of the model (`Linear(in_features=512, out_features=256)`) from a quantile uniform distribution with lower bound 512, upper bound 1000 and `q = 1`. 
+For example, `2_hidden: ['quniform', 512, 1000, 1]` means to sample the hidden size of layer 2 of the model (`Linear(in_features=512, out_features=256)`) from a quantile uniform distribution with lower bound 512, upper bound 1000 and `q = 1`.
 
 `all_dropout: ['choice', [[0], ['uniform', 0.1, 0.5]]]` means to choose whether to apply dropout or not to all layers. `choice` means pick from elements in a list and `[0]` means False while the other choice, implicitly implied to mean true, means to sample Dropout probability from a uniform distribution with lower bound 0.1 and upper bound 0.5.
 
 * Edit the `config.py` file to suit your needs. Concretely, you can edit the hyperparameters of HyperBand, the default learning rate, the dataset of choice, etc. There are 2 parameters that control the HyperBand algorithm:
   * `max_iter`: maximum number of iterations allocated to a given hyperparam config
-  * `eta`: proportion of configs discarded in each round of successive halving. 
+  * `eta`: proportion of configs discarded in each round of successive halving.
   * `epoch_scale`: a boolean indicating whether `max_iter` should be computed in terms of mini-batch iterations or epochs. This is useful if you want to speed up HyperBand and don't want to evaluate a full pass on a large dataset.
 
 Set `max_iter` to the usual amount you would train neural networks for. It's mostly a rule fo thumb, but something in the range `[80, 150]` epochs. Larger values of `nu` correspond to a more aggressive elimination schedule and thus fewer rounds of elimination. Increase to receive faster results at the cost of a sub-optimal performance. Authors advise a value of `3` or `4`.
