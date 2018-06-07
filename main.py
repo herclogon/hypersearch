@@ -24,7 +24,7 @@ def main(args):
         # '2_hidden': ['quniform', 512, 1000, 1],
         # '4_hidden': ['quniform', 128, 512, 1],
         # 'all_act': ['choice', [[0], ['choice', ['selu', 'elu', 'tanh']]]],
-        # 'all_dropout': ['choice', [[0], ['uniform', 0.1, 0.5]]],
+        'all_dropout': ['choice', [[0], ['uniform', 0.1, 0.5]]],
         # 'all_batchnorm': ['choice', [0, 1]],
         'all_l2': ['uniform', 1e-8, 1e-5],
         # 'optim': ['choice', ["adam", "sgd"]],

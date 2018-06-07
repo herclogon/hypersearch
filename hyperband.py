@@ -143,6 +143,8 @@ class Hyperband(object):
                         i+1, s+1, len(T), r_i)
                 )
 
+                # Todo: add condition for all models early stopping
+
                 # run each of the n_i configs for r_i iterations
                 val_losses = []
                 with tqdm(total=len(T)) as pbar:
@@ -162,7 +164,7 @@ class Hyperband(object):
             best_idx = np.argmin(val_losses)
             best_configs.append([T[best_idx], val_losses[best_idx]])
 
-        best_idx = np.argmax([b[1] for b in best_configs])
+        best_idx = np.argmin([b[1] for b in best_configs])
         best_model = best_configs[best_idx]
         results["val_loss"] = best_model[1]
         results["params"] = best_model[0].new_params

@@ -1,0 +1,31 @@
+{
+    "params": {
+        "all_drop": true,
+        "lr": 0.001,
+        "optim": "adam",
+        "reg_layers": [
+            [
+                0,
+                2.502849936284388e-07,
+                true
+            ],
+            [
+                3,
+                1.5393190990195317e-06,
+                true
+            ],
+            [
+                6,
+                5.261597656263463e-06,
+                true
+            ],
+            [
+                9,
+                8.992745293303612e-06,
+                true
+            ]
+        ]
+    },
+    "str": "Sequential(\n  (0): Linear(in_features=784, out_features=512, bias=True)\n  (1): ReLU()\n  (2): Dropout(p=0.38946513196105836)\n  (3): Linear(in_features=512, out_features=256, bias=True)\n  (4): ReLU()\n  (5): Dropout(p=0.38946513196105836)\n  (6): Linear(in_features=256, out_features=128, bias=True)\n  (7): ReLU()\n  (8): Dropout(p=0.38946513196105836)\n  (9): Linear(in_features=128, out_features=10, bias=True)\n  (10): LogSoftmax()\n)",
+    "val_loss": 0.0673851669843231
+}
