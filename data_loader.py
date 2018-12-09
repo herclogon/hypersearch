@@ -39,6 +39,9 @@ def get_train_valid_loader(data_dir,
     """
     error_msg1 = "[!] valid_size should be in the range [0, 1]."
     error_msg2 = "[!] Invalid dataset name."
+
+    print("Dataset name:", name)
+
     assert ((valid_size >= 0) and (valid_size <= 1)), error_msg1
     assert name in ['mnist', 'cifar10', 'cifar100', 'FashionMNIST'], error_msg2
 
