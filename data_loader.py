@@ -40,7 +40,7 @@ def get_train_valid_loader(data_dir,
     error_msg1 = "[!] valid_size should be in the range [0, 1]."
     error_msg2 = "[!] Invalid dataset name."
     assert ((valid_size >= 0) and (valid_size <= 1)), error_msg1
-    assert name in ['mnist', 'cifar10', 'cifar100'], error_msg2
+    assert name in ['mnist', 'cifar10', 'cifar100', 'FashionMNIST'], error_msg2
 
     # define transforms
     if name == 'mnist':
@@ -70,6 +70,15 @@ def get_train_valid_loader(data_dir,
             download=True, transform=train_trans,
         )
         valid_dataset = datasets.MNIST(
+            root=data_dir, train=True,
+            download=True, transform=valid_trans,
+        )
+    elif name == 'FashionMNIST':
+        train_dataset = datasets.FashionMNIST(
+            root=data_dir, train=True,
+            download=True, transform=train_trans,
+        )
+        valid_dataset = datasets.FashionMNIST(
             root=data_dir, train=True,
             download=True, transform=valid_trans,
         )

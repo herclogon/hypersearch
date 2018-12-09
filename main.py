@@ -27,9 +27,9 @@ def main(args):
         'all_dropout': ['choice', [[0], ['uniform', 0.1, 0.5]]],
         # 'all_batchnorm': ['choice', [0, 1]],
         'all_l2': ['uniform', 1e-8, 1e-5],
-        # 'optim': ['choice', ["adam", "sgd"]],
-        # 'lr': ['uniform', 1e-3, 8e-3],
-        # 'batch_size': ['quniform', 32, 128, 1]
+        'optim': ['choice', ["adam"]],
+        'lr': ['uniform', 1e-3, 8e-3],
+        'batch_size': ['quniform', 32, 128, 1]
     }
 
     # instantiate hyperband object
@@ -44,4 +44,5 @@ def main(args):
 
 if __name__ == '__main__':
     args, unparsed = config.get_args()
+    print(args)
     main(args)
