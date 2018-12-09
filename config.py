@@ -47,7 +47,7 @@ train_arg.add_argument('--patience', type=int, default=5,
 
 # misc params
 misc_arg = add_argument_group('Misc.')
-misc_arg.add_argument('--num_gpu', type=int, default=0,
+misc_arg.add_argument('--num_gpu', type=int, default=1,
                       help='0 for cpu, greater for gpu')
 misc_arg.add_argument('--data_dir', type=str, default='./data/',
                       help='Directory in which data is stored')
